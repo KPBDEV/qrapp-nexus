@@ -21,11 +21,226 @@ const btnLogout = document.getElementById('btn-logout');
 const userWelcome = document.getElementById('user-welcome');
 const loginMessage = document.getElementById('login-message');
 
-// Usuarios registrados (en localStorage)
-let usuarios = JSON.parse(localStorage.getItem('nexus_usuarios')) || [];
-let usuarioActual = JSON.parse(localStorage.getItem('nexus_usuario_actual')) || null;
+// Usuario actual (sessionStorage para persistir durante la sesión)
+let usuarioActual = JSON.parse(sessionStorage.getItem('nexus_usuario_actual')) || null;
+
+// ========== FUNCIONES DE AUTENTICACIÓN CON SUPABASE ==========
+
+// Función para hashear contraseña (simple base64 para demo)
+function hashPassword(password) {
+    return btoa(unescape(encodeURIComponent(password)));
+}
+
+// Manejar login CON SUPABASE
+async function handleLogin() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+
+    if (!username || !password) {
+        showAuthMessage('Por favor completa todos los campos', 'error');
+        return;
+    }
+
+    try {
+        showAuthMessage('Verificando credenciales...', 'info');
+        
+        // Buscar usuario en Supabase
+        const { data, error } = await supabase
+            .from('nexus_usuarios')
+            .select('*')
+            .eq('username', username)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                showAuthMessage('Usuario no encontrado', 'error');
+            } else {
+                showAuthMessage('Error de conexión: ' + error.message, 'error');
+            }
+            return;
+        }
+
+        // Verificar contraseña
+        const passwordHash = hashPassword(password);
+        if (data.password_hash === passwordHash) {
+            usuarioActual = {
+                id: data.id,
+                username: data.username,
+                fechaRegistro: data.fecha_registro
+            };
+            
+            sessionStorage.setItem('nexus_usuario_actual', JSON.stringify(usuarioActual));
+            showApp();
+            showAuthMessage('¡Bienvenido!', 'success');
+        } else {
+            showAuthMessage('Contraseña incorrecta', 'error');
+        }
+
+    } catch (error) {
+        console.error('Error en login:', error);
+        showAuthMessage('Error de conexión con el servidor', 'error');
+    }
+}
+
+// Manejar registro CON SUPABASE
+async function handleRegister() {
+    const username = document.getElementById('register-username').value.trim();
+    const password = document.getElementById('register-password').value.trim();
+    const organizerCode = document.getElementById('organizer-code').value.trim();
+
+    if (!username || !password || !organizerCode) {
+        showAuthMessage('Por favor completa todos los campos', 'error');
+        return;
+    }
+
+    if (password.length < 6) {
+        showAuthMessage('La contraseña debe tener al menos 6 caracteres', 'error');
+        return;
+    }
+
+    if (organizerCode !== ORGANIZER_CODE) {
+        showAuthMessage('Código de organizador incorrecto', 'error');
+        return;
+    }
+
+    try {
+        showAuthMessage('Creando cuenta...', 'info');
+
+        // Verificar si el usuario ya existe
+        const { data: existingUser, error: checkError } = await supabase
+            .from('nexus_usuarios')
+            .select('username')
+            .eq('username', username)
+            .single();
+
+        // Si encuentra un usuario, existe
+        if (existingUser) {
+            showAuthMessage('Este usuario ya existe', 'error');
+            return;
+        }
+
+        // Crear nuevo usuario
+        const passwordHash = hashPassword(password);
+        const { data, error } = await supabase
+            .from('nexus_usuarios')
+            .insert([
+                {
+                    username: username,
+                    password_hash: passwordHash
+                }
+            ])
+            .select()
+            .single();
+
+        if (error) {
+            if (error.code === '23505') { // Unique violation
+                showAuthMessage('Este usuario ya existe', 'error');
+            } else {
+                showAuthMessage('Error creando la cuenta: ' + error.message, 'error');
+            }
+            return;
+        }
+
+        showAuthMessage('¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.', 'success');
+        
+        // Volver al login
+        setTimeout(() => {
+            registerForm.style.display = 'none';
+            loginForm.style.display = 'block';
+            document.getElementById('login-username').value = username;
+            document.getElementById('login-password').value = '';
+            document.getElementById('register-username').value = '';
+            document.getElementById('register-password').value = '';
+            document.getElementById('organizer-code').value = '';
+        }, 2000);
+
+    } catch (error) {
+        console.error('Error en registro:', error);
+        showAuthMessage('Error de conexión con el servidor', 'error');
+    }
+}
+
+// Manejar logout
+function handleLogout() {
+    usuarioActual = null;
+    sessionStorage.removeItem('nexus_usuario_actual');
+    showLogin();
+    showAuthMessage('Sesión cerrada correctamente', 'success');
+}
+
+// Mostrar mensajes de auth
+function showAuthMessage(text, type) {
+    loginMessage.textContent = text;
+    loginMessage.style.display = 'block';
+    loginMessage.style.color = type === 'error' ? '#ef4444' : 
+                              type === 'success' ? '#10b981' : '#6366f1';
+    loginMessage.style.fontWeight = '600';
+}
+
+// ========== INICIALIZACIÓN DE LA APLICACIÓN ==========
+function initApp() {
+    setupAuthEventListeners();
+    checkAuthStatus();
+}
+
+// Verificar estado de autenticación
+function checkAuthStatus() {
+    if (usuarioActual) {
+        showApp();
+    } else {
+        showLogin();
+    }
+}
+
+// Mostrar login
+function showLogin() {
+    loginScreen.style.display = 'flex';
+    appContainer.style.display = 'none';
+    loginForm.style.display = 'block';
+    registerForm.style.display = 'none';
+    loginMessage.style.display = 'none';
+}
+
+// Mostrar aplicación
+function showApp() {
+    loginScreen.style.display = 'none';
+    appContainer.style.display = 'block';
+    userWelcome.textContent = `Bienvenido, ${usuarioActual.username}`;
+    
+    // Iniciar la app original
+    initMainApp();
+}
+
+// Configurar event listeners de auth
+function setupAuthEventListeners() {
+    btnShowRegister.addEventListener('click', () => {
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+        loginMessage.style.display = 'none';
+    });
+
+    btnShowLogin.addEventListener('click', () => {
+        registerForm.style.display = 'none';
+        loginForm.style.display = 'block';
+        loginMessage.style.display = 'none';
+    });
+
+    btnLogin.addEventListener('click', handleLogin);
+    btnRegister.addEventListener('click', handleRegister);
+    btnLogout.addEventListener('click', handleLogout);
+
+    // Enter key en formularios
+    document.getElementById('login-password').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
+    
+    document.getElementById('organizer-code').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleRegister();
+    });
+}
 
 // ========== VARIABLES DE LA APP PRINCIPAL ==========
+
 // Base de datos local como fallback
 let clientes = JSON.parse(localStorage.getItem('clientes')) || [];
 let codigosUsados = JSON.parse(localStorage.getItem('codigosUsados')) || [];
@@ -139,17 +354,6 @@ function handleLogin() {
         showAuthMessage('Por favor completa todos los campos', 'error');
         return;
     }
-
-    const usuario = usuarios.find(u => u.username === username && u.password === password);
-    
-    if (usuario) {
-        usuarioActual = usuario;
-        localStorage.setItem('nexus_usuario_actual', JSON.stringify(usuarioActual));
-        showApp();
-        showAuthMessage('¡Bienvenido!', 'success');
-    } else {
-        showAuthMessage('Usuario o contraseña incorrectos', 'error');
-    }
 }
 
 // Manejar registro
@@ -177,16 +381,6 @@ function handleRegister() {
         showAuthMessage('Este usuario ya existe', 'error');
         return;
     }
-
-    const nuevoUsuario = {
-        id: Date.now(),
-        username,
-        password,
-        fechaRegistro: new Date().toISOString()
-    };
-
-    usuarios.push(nuevoUsuario);
-    localStorage.setItem('nexus_usuarios', JSON.stringify(usuarios));
     
     showAuthMessage('¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.', 'success');
     
@@ -933,5 +1127,4 @@ async function limpiarBaseDatos() {
 }
 
 // ========== INICIALIZACIÓN FINAL ==========
-
 document.addEventListener('DOMContentLoaded', initApp);
