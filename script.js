@@ -356,8 +356,8 @@ function handleLogin() {
     }
 }
 
-// Manejar registro
-function handleRegister() {
+// Manejar registro CON SUPABASE
+async function handleRegister() {
     const username = document.getElementById('register-username').value.trim();
     const password = document.getElementById('register-password').value.trim();
     const organizerCode = document.getElementById('organizer-code').value.trim();
@@ -377,9 +377,60 @@ function handleRegister() {
         return;
     }
 
-    if (usuarios.find(u => u.username === username)) {
-        showAuthMessage('Este usuario ya existe', 'error');
-        return;
+    try {
+        showAuthMessage('Creando cuenta...', 'info');
+
+        // VERIFICAR SI EL USUARIO YA EXISTE EN SUPABASE
+        const { data: existingUser, error: checkError } = await supabase
+            .from('nexus_usuarios')
+            .select('username')
+            .eq('username', username)
+            .single();
+
+        // Si encuentra un usuario, existe
+        if (existingUser) {
+            showAuthMessage('Este usuario ya existe', 'error');
+            return;
+        }
+
+        // Crear nuevo usuario
+        const passwordHash = hashPassword(password);
+        const { data, error } = await supabase
+            .from('nexus_usuarios')
+            .insert([
+                {
+                    username: username,
+                    password_hash: passwordHash
+                }
+            ])
+            .select()
+            .single();
+
+        if (error) {
+            if (error.code === '23505') { // Unique violation
+                showAuthMessage('Este usuario ya existe', 'error');
+            } else {
+                showAuthMessage('Error creando la cuenta: ' + error.message, 'error');
+            }
+            return;
+        }
+
+        showAuthMessage('¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.', 'success');
+        
+        // Volver al login
+        setTimeout(() => {
+            registerForm.style.display = 'none';
+            loginForm.style.display = 'block';
+            document.getElementById('login-username').value = username;
+            document.getElementById('login-password').value = '';
+            document.getElementById('register-username').value = '';
+            document.getElementById('register-password').value = '';
+            document.getElementById('organizer-code').value = '';
+        }, 2000);
+
+    } catch (error) {
+        console.error('Error en registro:', error);
+        showAuthMessage('Error de conexión con el servidor', 'error');
     }
     
     showAuthMessage('¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.', 'success');
