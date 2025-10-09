@@ -357,6 +357,7 @@ function handleLogin() {
 }
 
 // Manejar registro CON SUPABASE
+// Manejar registro CON SUPABASE (VERSIÓN CORREGIDA)
 async function handleRegister() {
     const username = document.getElementById('register-username').value.trim();
     const password = document.getElementById('register-password').value.trim();
@@ -380,15 +381,19 @@ async function handleRegister() {
     try {
         showAuthMessage('Creando cuenta...', 'info');
 
-        // VERIFICAR SI EL USUARIO YA EXISTE EN SUPABASE
-        const { data: existingUser, error: checkError } = await supabase
+        // VERIFICAR SI EL USUARIO YA EXISTE EN SUPABASE (CORREGIDO)
+        const { data: existingUsers, error: checkError } = await supabase
             .from('nexus_usuarios')
             .select('username')
-            .eq('username', username)
-            .single();
+            .eq('username', username);
 
-        // Si encuentra un usuario, existe
-        if (existingUser) {
+        if (checkError) {
+            console.log('Error en verificación (puede ignorarse):', checkError);
+            // Continuamos aunque haya error en la verificación
+        }
+
+        // Si encuentra algún usuario, existe
+        if (existingUsers && existingUsers.length > 0) {
             showAuthMessage('Este usuario ya existe', 'error');
             return;
         }
@@ -403,8 +408,7 @@ async function handleRegister() {
                     password_hash: passwordHash
                 }
             ])
-            .select()
-            .single();
+            .select();
 
         if (error) {
             if (error.code === '23505') { // Unique violation
@@ -432,19 +436,6 @@ async function handleRegister() {
         console.error('Error en registro:', error);
         showAuthMessage('Error de conexión con el servidor', 'error');
     }
-    
-    showAuthMessage('¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.', 'success');
-    
-    // Volver al login
-    setTimeout(() => {
-        registerForm.style.display = 'none';
-        loginForm.style.display = 'block';
-        document.getElementById('login-username').value = username;
-        document.getElementById('login-password').value = '';
-        document.getElementById('register-username').value = '';
-        document.getElementById('register-password').value = '';
-        document.getElementById('organizer-code').value = '';
-    }, 2000);
 }
 
 // Manejar logout
