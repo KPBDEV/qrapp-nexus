@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificación QR - Evento Privado</title>
+    <link rel="stylesheet" href="styles.css?v=4">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <!-- SUPABASE SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <header>
+        <h1>Sistema de Verificación QR</h1>
+        <p class="subtitle">Evento Privado - Acceso Controlado</p>
+    </header>
+    
+    <div class="container">
+        <div class="button-container">
+            <button id="btn-ingresar" class="primary-btn">Ingresar datos</button>
+            <button id="btn-verificar" class="secondary-btn">Verificar código</button>
+            <button id="btn-gestionar" class="tertiary-btn">Gestionar accesos</button>
+        </div>
+        
+        <div id="ingresar-section" class="section active">
+            <h2>Ingresar datos del cliente</h2>
+            <form id="client-form">
+                <div class="form-group">
+                    <label for="nombre">Nombre completo</label>
+                    <input type="text" id="nombre" required>
+                </div>
+                <div class="form-group">
+                    <label for="identificacion">Número de identificación</label>
+                    <input type="text" id="identificacion" required>
+                </div>
+                <div class="form-group">
+                    <label for="telefono">Teléfono</label>
+                    <input type="tel" id="telefono" required>
+                </div>
+                <button type="submit" class="primary-btn">Generar código QR</button>
+            </form>
+            
+            <div class="qr-container">
+                <p id="qr-message">El código QR aparecerá aquí después de ingresar los datos</p>
+                <div id="qrcode"></div>
+            </div>
+        </div>
+        
+        <div id="verificar-section" class="section">
+            <h2>Verificar código QR</h2>
+            <div class="verification-section">
+                <div class="camera-container">
+                    <div id="scanner">
+                        <video id="video" playsinline style="display: none;"></video>
+                        <canvas id="canvas" style="display: none;"></canvas>
+                        <p id="camera-placeholder">Cámara no activada</p>
+                    </div>
+                </div>
+                
+                <div class="camera-controls">
+                    <button id="btn-start-camera" class="primary-btn">Activar Cámara</button>
+                    <button id="btn-stop-camera" class="primary-btn" style="display: none;">Desactivar Cámara</button>
+                </div>
+                
+                <p class="instructions">Coloque el código QR frente a la cámara para escanear automáticamente</p>
+                
+                <div class="form-group">
+                    <label for="codigo-manual">O ingrese el código manualmente:</label>
+                    <input type="text" id="codigo-manual" placeholder="Número de identificación">
+                </div>
+                <button id="btn-verificar-manual" class="secondary-btn">Verificar código</button>
+                
+                <div id="verification-result" class="verification-result">
+                    <div class="checkmark">✓</div>
+                    <h3 id="result-title">Verificación exitosa</h3>
+                    <p id="result-message">El código QR es válido</p>
+                    <div id="client-details" class="client-info"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="gestionar-section" class="section">
+            <h2>Gestionar Accesos y Reingresos</h2>
+            
+            <div class="stats-container">
+                <div class="stat-card">
+                    <h3>Total Registrados</h3>
+                    <span id="total-registrados" class="stat-number">0</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Ingresaron</h3>
+                    <span id="total-ingresaron" class="stat-number">0</span>
+                </div>
+                <div class="stat-card">
+                    <h3>Por Ingresar</h3>
+                    <span id="total-pendientes" class="stat-number">0</span>
+                </div>
+            </div>
+
+            <div class="search-container">
+                <input type="text" id="buscar-cliente" placeholder="Buscar por nombre o identificación...">
+                <button id="btn-buscar" class="primary-btn">Buscar</button>
+            </div>
+
+            <div class="clientes-list">
+                <h3>Lista de Clientes Registrados</h3>
+                <div id="lista-clientes" class="lista-container">
+                    <!-- Aquí se cargarán los clientes dinámicamente -->
+                </div>
+            </div>
+
+            <div class="reingreso-section">
+                <h3>Autorizar Reingreso</h3>
+                <div class="form-group">
+                    <label for="codigo-reingreso">Código para reingreso:</label>
+                    <input type="text" id="codigo-reingreso" placeholder="Número de identificación">
+                </div>
+                <button id="btn-autorizar-reingreso" class="secondary-btn">Autorizar Reingreso</button>
+                <p class="instructions">Permite que una persona que ya ingresó pueda volver a entrar</p>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>Sistema de verificación para evento privado</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
