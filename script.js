@@ -6,7 +6,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ========== SISTEMA DE AUTENTICACIÓN NEXUS ==========
-const ORGANIZER_CODE = "NEXUS2024"; // Código secreto para crear cuentas
+const ORGANIZER_CODE = "NEXUS.082208"; // Código secreto para crear cuentas
 
 // Elementos de login
 const loginScreen = document.getElementById('login-screen');
@@ -933,4 +933,5 @@ async function limpiarBaseDatos() {
 }
 
 // ========== INICIALIZACIÓN FINAL ==========
+
 document.addEventListener('DOMContentLoaded', initApp);
