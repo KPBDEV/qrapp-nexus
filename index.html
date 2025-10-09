@@ -3,128 +3,195 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verificación QR - Evento Privado</title>
-    <link rel="stylesheet" href="styles.css?v=4">
+    <title>NEXUS - Gestión de Eventos</title>
+    <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-    <!-- SUPABASE SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <header>
-        <h1>Sistema de Verificación QR</h1>
-        <p class="subtitle">Evento Privado - Acceso Controlado</p>
-    </header>
-    
-    <div class="container">
-        <div class="button-container">
-            <button id="btn-ingresar" class="primary-btn">Ingresar datos</button>
-            <button id="btn-verificar" class="secondary-btn">Verificar código</button>
-            <button id="btn-gestionar" class="tertiary-btn">Gestionar accesos</button>
-        </div>
-        
-        <div id="ingresar-section" class="section active">
-            <h2>Ingresar datos del cliente</h2>
-            <form id="client-form">
-                <div class="form-group">
-                    <label for="nombre">Nombre completo</label>
-                    <input type="text" id="nombre" required>
-                </div>
-                <div class="form-group">
-                    <label for="identificacion">Número de identificación</label>
-                    <input type="text" id="identificacion" required>
-                </div>
-                <div class="form-group">
-                    <label for="telefono">Teléfono</label>
-                    <input type="tel" id="telefono" required>
-                </div>
-                <button type="submit" class="primary-btn">Generar código QR</button>
-            </form>
+    <!-- PANTALLA DE LOGIN -->
+    <div id="login-screen" class="login-container">
+        <div class="login-box">
+            <div class="nexus-logo">NEXUS</div>
+            <p class="login-subtitle">Gestión Profesional de Eventos</p>
             
-            <div class="qr-container">
-                <p id="qr-message">El código QR aparecerá aquí después de ingresar los datos</p>
-                <div id="qrcode"></div>
-            </div>
-        </div>
-        
-        <div id="verificar-section" class="section">
-            <h2>Verificar código QR</h2>
-            <div class="verification-section">
-                <div class="camera-container">
-                    <div id="scanner">
-                        <video id="video" playsinline style="display: none;"></video>
-                        <canvas id="canvas" style="display: none;"></canvas>
-                        <p id="camera-placeholder">Cámara no activada</p>
-                    </div>
+            <div id="login-form" class="nexus-form-group">
+                <h3 class="login-title">Iniciar Sesión</h3>
+                
+                <div class="nexus-form-group">
+                    <label class="nexus-label">Usuario</label>
+                    <input type="text" id="login-username" class="nexus-input" placeholder="Tu usuario">
                 </div>
                 
-                <div class="camera-controls">
-                    <button id="btn-start-camera" class="primary-btn">Activar Cámara</button>
-                    <button id="btn-stop-camera" class="primary-btn" style="display: none;">Desactivar Cámara</button>
+                <div class="nexus-form-group">
+                    <label class="nexus-label">Contraseña</label>
+                    <input type="password" id="login-password" class="nexus-input" placeholder="Tu contraseña">
                 </div>
                 
-                <p class="instructions">Coloque el código QR frente a la cámara para escanear automáticamente</p>
+                <button id="btn-login" class="nexus-btn nexus-btn-primary" style="width: 100%; margin-bottom: 15px;">
+                    Acceder al Sistema
+                </button>
                 
-                <div class="form-group">
-                    <label for="codigo-manual">O ingrese el código manualmente:</label>
-                    <input type="text" id="codigo-manual" placeholder="Número de identificación">
-                </div>
-                <button id="btn-verificar-manual" class="secondary-btn">Verificar código</button>
+                <button id="btn-show-register" class="nexus-btn" style="width: 100%;">
+                    Crear Cuenta Nueva
+                </button>
+            </div>
+
+            <div id="register-form" class="nexus-form-group" style="display: none;">
+                <h3 class="login-title">Crear Cuenta</h3>
                 
-                <div id="verification-result" class="verification-result">
-                    <div class="checkmark">✓</div>
-                    <h3 id="result-title">Verificación exitosa</h3>
-                    <p id="result-message">El código QR es válido</p>
-                    <div id="client-details" class="client-info"></div>
+                <div class="nexus-form-group">
+                    <label class="nexus-label">Usuario</label>
+                    <input type="text" id="register-username" class="nexus-input" placeholder="Elige un usuario">
                 </div>
-            </div>
-        </div>
-
-        <div id="gestionar-section" class="section">
-            <h2>Gestionar Accesos y Reingresos</h2>
-            
-            <div class="stats-container">
-                <div class="stat-card">
-                    <h3>Total Registrados</h3>
-                    <span id="total-registrados" class="stat-number">0</span>
+                
+                <div class="nexus-form-group">
+                    <label class="nexus-label">Contraseña</label>
+                    <input type="password" id="register-password" class="nexus-input" placeholder="Mínimo 6 caracteres">
                 </div>
-                <div class="stat-card">
-                    <h3>Ingresaron</h3>
-                    <span id="total-ingresaron" class="stat-number">0</span>
+                
+                <div class="nexus-form-group">
+                    <label class="nexus-label">Código de Organizador</label>
+                    <input type="password" id="organizer-code" class="nexus-input" placeholder="Código secreto">
                 </div>
-                <div class="stat-card">
-                    <h3>Por Ingresar</h3>
-                    <span id="total-pendientes" class="stat-number">0</span>
-                </div>
+                
+                <button id="btn-register" class="nexus-btn nexus-btn-success" style="width: 100%; margin-bottom: 15px;">
+                    Crear Cuenta
+                </button>
+                
+                <button id="btn-show-login" class="nexus-btn" style="width: 100%;">
+                    ← Volver al Login
+                </button>
             </div>
 
-            <div class="search-container">
-                <input type="text" id="buscar-cliente" placeholder="Buscar por nombre o identificación...">
-                <button id="btn-buscar" class="primary-btn">Buscar</button>
-            </div>
-
-            <div class="clientes-list">
-                <h3>Lista de Clientes Registrados</h3>
-                <div id="lista-clientes" class="lista-container">
-                    <!-- Aquí se cargarán los clientes dinámicamente -->
-                </div>
-            </div>
-
-            <div class="reingreso-section">
-                <h3>Autorizar Reingreso</h3>
-                <div class="form-group">
-                    <label for="codigo-reingreso">Código para reingreso:</label>
-                    <input type="text" id="codigo-reingreso" placeholder="Número de identificación">
-                </div>
-                <button id="btn-autorizar-reingreso" class="secondary-btn">Autorizar Reingreso</button>
-                <p class="instructions">Permite que una persona que ya ingresó pueda volver a entrar</p>
-            </div>
+            <div id="login-message" class="nexus-form-group" style="display: none;"></div>
         </div>
     </div>
-    
-    <footer>
-        <p>Sistema de verificación para evento privado</p>
-    </footer>
+
+    <!-- APLICACIÓN PRINCIPAL (oculta inicialmente) -->
+    <div id="app-container" style="display: none;">
+        <header class="nexus-header">
+            <div class="nexus-logo">NEXUS</div>
+            <p class="nexus-subtitle">Gestión Profesional de Eventos</p>
+            <div style="margin-top: 15px;">
+                <span id="user-welcome" style="color: var(--nexus-text-secondary);"></span>
+                <button id="btn-logout" class="nexus-btn" style="margin-left: 15px; padding: 8px 15px;">
+                    Cerrar Sesión
+                </button>
+            </div>
+        </header>
+        
+        <div class="nexus-container">
+            <div class="button-container">
+                <button id="btn-ingresar" class="nexus-btn nexus-btn-primary">Ingresar datos</button>
+                <button id="btn-verificar" class="nexus-btn nexus-btn-success">Verificar código</button>
+                <button id="btn-gestionar" class="nexus-btn nexus-btn-warning">Gestionar accesos</button>
+            </div>
+            
+            <div id="ingresar-section" class="nexus-section active">
+                <h2>Ingresar datos del cliente</h2>
+                <form id="client-form">
+                    <div class="nexus-form-group">
+                        <label class="nexus-label" for="nombre">Nombre completo</label>
+                        <input type="text" id="nombre" class="nexus-input" required>
+                    </div>
+                    <div class="nexus-form-group">
+                        <label class="nexus-label" for="identificacion">Número de identificación</label>
+                        <input type="text" id="identificacion" class="nexus-input" required>
+                    </div>
+                    <div class="nexus-form-group">
+                        <label class="nexus-label" for="telefono">Teléfono</label>
+                        <input type="tel" id="telefono" class="nexus-input" required>
+                    </div>
+                    <button type="submit" class="nexus-btn nexus-btn-primary">Generar código QR</button>
+                </form>
+                
+                <div class="nexus-qr-container">
+                    <p id="qr-message">El código QR aparecerá aquí después de ingresar los datos</p>
+                    <div id="qrcode"></div>
+                </div>
+            </div>
+            
+            <div id="verificar-section" class="nexus-section">
+                <h2>Verificar código QR</h2>
+                <div class="verification-section">
+                    <div class="camera-container">
+                        <div id="scanner">
+                            <video id="video" playsinline style="display: none;"></video>
+                            <canvas id="canvas" style="display: none;"></canvas>
+                            <p id="camera-placeholder">Cámara no activada</p>
+                        </div>
+                    </div>
+                    
+                    <div class="camera-controls">
+                        <button id="btn-start-camera" class="nexus-btn nexus-btn-primary">Activar Cámara</button>
+                        <button id="btn-stop-camera" class="nexus-btn nexus-btn-primary" style="display: none;">Desactivar Cámara</button>
+                    </div>
+                    
+                    <p class="instructions">Coloque el código QR frente a la cámara para escanear automáticamente</p>
+                    
+                    <div class="nexus-form-group">
+                        <label class="nexus-label" for="codigo-manual">O ingrese el código manualmente:</label>
+                        <input type="text" id="codigo-manual" class="nexus-input" placeholder="Número de identificación">
+                    </div>
+                    <button id="btn-verificar-manual" class="nexus-btn nexus-btn-success">Verificar código</button>
+                    
+                    <div id="verification-result" class="verification-result">
+                        <div class="checkmark">✓</div>
+                        <h3 id="result-title">Verificación exitosa</h3>
+                        <p id="result-message">El código QR es válido</p>
+                        <div id="client-details" class="client-info"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="gestionar-section" class="nexus-section">
+                <h2>Gestionar Accesos y Reingresos</h2>
+                
+                <div class="nexus-stats">
+                    <div class="nexus-stat-card">
+                        <h3>Total Registrados</h3>
+                        <span id="total-registrados" class="nexus-stat-number">0</span>
+                    </div>
+                    <div class="nexus-stat-card">
+                        <h3>Ingresaron</h3>
+                        <span id="total-ingresaron" class="nexus-stat-number">0</span>
+                    </div>
+                    <div class="nexus-stat-card">
+                        <h3>Por Ingresar</h3>
+                        <span id="total-pendientes" class="nexus-stat-number">0</span>
+                    </div>
+                </div>
+
+                <div class="search-container">
+                    <input type="text" id="buscar-cliente" class="nexus-input" placeholder="Buscar por nombre o identificación...">
+                    <button id="btn-buscar" class="nexus-btn nexus-btn-primary">Buscar</button>
+                </div>
+
+                <div class="clientes-list">
+                    <h3>Lista de Clientes Registrados</h3>
+                    <div id="lista-clientes" class="lista-container">
+                        <!-- Aquí se cargarán los clientes dinámicamente -->
+                    </div>
+                </div>
+
+                <div class="reingreso-section">
+                    <h3>Autorizar Reingreso</h3>
+                    <div class="nexus-form-group">
+                        <label class="nexus-label" for="codigo-reingreso">Código para reingreso:</label>
+                        <input type="text" id="codigo-reingreso" class="nexus-input" placeholder="Número de identificación">
+                    </div>
+                    <button id="btn-autorizar-reingreso" class="nexus-btn nexus-btn-success">Autorizar Reingreso</button>
+                    <p class="instructions">Permite que una persona que ya ingresó pueda volver a entrar</p>
+                </div>
+            </div>
+        </div>
+        
+        <footer style="text-align: center; margin-top: 40px; color: var(--nexus-text-secondary);">
+            <p>NEXUS - Sistema de gestión para eventos privados</p>
+        </footer>
+    </div>
 
     <script src="script.js"></script>
 </body>
