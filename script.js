@@ -314,12 +314,30 @@ function showVerificarSection() {
 }
 
 function showGestionarSection() {
-    document.getElementById('gestionar-section').classList.add('active');
-    document.getElementById('ingresar-section').classList.remove('active');
-    document.getElementById('verificar-section').classList.remove('active');
-    stopCamera();
+    console.log('📊 Mostrando sección de gestión...');
+    
+    // Obtener elementos de forma segura
+    const gestionarSection = document.getElementById('gestionar-section');
+    const ingresarSection = document.getElementById('ingresar-section');
+    const verificarSection = document.getElementById('verificar-section');
+    
+    // Actualizar clases activas
+    if (gestionarSection) gestionarSection.classList.add('active');
+    if (ingresarSection) ingresarSection.classList.remove('active');
+    if (verificarSection) verificarSection.classList.remove('active');
+    
+    // Detener cámara de forma segura
+    try {
+        stopCamera();
+    } catch (error) {
+        console.log('⚠️ Error al detener cámara en gestión:', error);
+    }
+    
+    // Actualizar interfaz
     actualizarEstadisticas();
     cargarListaClientes();
+    
+    console.log('✅ Sección de gestión mostrada');
 }
 
 async function handleClientFormSubmit(e) {
@@ -416,12 +434,13 @@ function generarQR(identificacion) {
     }
 }
 
-// ... (EL RESTO DE LAS FUNCIONES DE LA APP PRINCIPAL SE MANTIENEN IGUAL)
-// [Aquí va todo el resto de tu código original de la app principal]
-// startCamera, stopCamera, verificarCodigo, actualizarEstadisticas, etc.
-
 // ========== SISTEMA DE SINCRONIZACIÓN ==========
 let sincronizacionActiva = false;
+
+// ========== VARIABLES GLOBALES PARA LA CÁMARA ==========
+let stream = null;
+let scanning = false;
+let animationFrame = null;
 
 async function subirCambiosASupabase() {
     try {
@@ -493,102 +512,162 @@ function autorizarReingreso() {
 
 // Funciones de cámara básicas
 async function startCamera() {
+    console.log('🎥 Intentando iniciar cámara...');
+    
     try {
+        // Primero detener cualquier cámara activa
         stopCamera();
         
-        console.log('🎥 Iniciando cámara...');
-        
+        // Solicitar permisos de cámara
         const constraints = {
             video: { 
                 facingMode: "environment",
                 width: { ideal: 1280 },
-                height: { ideal: 720 },
-                frameRate: { ideal: 24 }
+                height: { ideal: 720 }
             } 
         };
 
+        console.log('📷 Solicitando acceso a cámara...');
         stream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('✅ Acceso a cámara concedido');
         
-        // CONFIGURAR VIDEO PRINCIPAL
+        // Obtener elementos de forma segura
         const video = document.getElementById('video');
         const cameraPlaceholder = document.getElementById('camera-placeholder');
         const canvas = document.getElementById('canvas');
         const btnStartCamera = document.getElementById('btn-start-camera');
         const btnStopCamera = document.getElementById('btn-stop-camera');
         
+        if (!video) {
+            throw new Error('Elemento video no encontrado');
+        }
+        
+        // Configurar video
         video.srcObject = stream;
         video.style.display = 'block';
         video.style.width = '100%';
         video.style.height = '100%';
         video.style.objectFit = 'cover';
         
-        // OCULTAR ELEMENTOS QUE CAUSAN DUPLICACIÓN
-        if (cameraPlaceholder) cameraPlaceholder.style.display = 'none';
-        if (canvas) canvas.style.display = 'none';
+        // Ocultar placeholder y mostrar video
+        if (cameraPlaceholder) {
+            cameraPlaceholder.style.display = 'none';
+        }
         
-        if (btnStartCamera) btnStartCamera.style.display = 'none';
-        if (btnStopCamera) btnStopCamera.style.display = 'inline-block';
+        if (canvas) {
+            canvas.style.display = 'none';
+        }
         
-        // AGREGAR OVERLAY CON TRANSPARENCIA
+        // Actualizar botones
+        if (btnStartCamera) {
+            btnStartCamera.style.display = 'none';
+        }
+        
+        if (btnStopCamera) {
+            btnStopCamera.style.display = 'inline-block';
+        }
+        
+        // Agregar overlay de escaneo
         agregarOverlayConTransparencia();
         
+        // Esperar a que el video esté listo
         video.addEventListener('loadedmetadata', () => {
+            console.log('🎬 Video cargado, reproduciendo...');
             video.play().then(() => {
-                console.log('✅ Video listo, iniciando escaneo...');
-                // Configurar canvas EN MEMORIA (no visible)
+                console.log('✅ Video reproduciéndose, iniciando escáner QR...');
+                
+                // Configurar canvas para escaneo
                 if (canvas) {
                     canvas.width = 320;
                     canvas.height = 240;
                 }
+                
+                // Iniciar escaneo QR
                 startQRScanning();
+            }).catch(error => {
+                console.error('❌ Error al reproducir video:', error);
             });
         });
         
     } catch (err) {
-        console.error('Error al acceder a la cámara:', err);
+        console.error('❌ Error al acceder a la cámara:', err);
+        
+        // Mostrar error al usuario
         const cameraPlaceholder = document.getElementById('camera-placeholder');
         if (cameraPlaceholder) {
-            cameraPlaceholder.innerHTML = '❌ Error: ' + err.message;
+            cameraPlaceholder.innerHTML = `
+                ❌ Error: ${err.name === 'NotAllowedError' ? 'Permiso de cámara denegado' : err.message}
+                <br><small>Asegúrate de permitir el acceso a la cámara</small>
+            `;
             cameraPlaceholder.style.display = 'block';
         }
+        
+        // Resetear estado
+        stopCamera();
     }
 }
 
 function stopCamera() {
+    console.log('🛑 Deteniendo cámara...');
+    
+    // Detener stream si existe
     if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        stream = null;
+        try {
+            stream.getTracks().forEach(track => {
+                track.stop();
+            });
+            stream = null;
+        } catch (error) {
+            console.log('Error al detener stream:', error);
+        }
     }
+    
+    // Limpiar animation frame si existe
     if (animationFrame) {
         clearTimeout(animationFrame);
         animationFrame = null;
     }
     
+    // Resetear variables de estado
+    scanning = false;
+    
+    // Obtener elementos de forma segura
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
     const cameraPlaceholder = document.getElementById('camera-placeholder');
     const btnStartCamera = document.getElementById('btn-start-camera');
     const btnStopCamera = document.getElementById('btn-stop-camera');
     
+    // Resetear elementos de UI
     if (video) {
         video.srcObject = null;
         video.style.display = 'none';
     }
-    if (canvas) canvas.style.display = 'none';
+    
+    if (canvas) {
+        canvas.style.display = 'none';
+    }
+    
     if (cameraPlaceholder) {
         cameraPlaceholder.style.display = 'block';
         cameraPlaceholder.textContent = 'Cámara no activada';
     }
-    if (btnStartCamera) btnStartCamera.style.display = 'inline-block';
-    if (btnStopCamera) btnStopCamera.style.display = 'none';
     
-    scanning = false;
+    if (btnStartCamera) {
+        btnStartCamera.style.display = 'inline-block';
+    }
     
-    // Remover overlay
+    if (btnStopCamera) {
+        btnStopCamera.style.display = 'none';
+    }
+    
+    // Remover overlay si existe
     const overlay = document.getElementById('scan-overlay');
     if (overlay) {
         overlay.remove();
     }
+    
+    console.log('✅ Cámara detenida correctamente');
 }
 
 // Inicialización de sincronización
