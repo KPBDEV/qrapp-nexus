@@ -141,6 +141,164 @@ function showAuthMessage(text, type) {
     }
 }
 
+// ========== FUNCIONES DE SINCRONIZACIÓN SUPABASE ==========
+
+// Crear elemento visual de estado de sincronización
+function crearElementoEstado() {
+    // Verificar si ya existe
+    let elemento = document.getElementById('estado-sincronizacion');
+    
+    if (!elemento) {
+        elemento = document.createElement('div');
+        elemento.id = 'estado-sincronizacion';
+        elemento.className = 'sincronizacion-estado sincronizado';
+        elemento.innerHTML = '🟢 Sincronizado';
+        document.body.appendChild(elemento);
+        console.log('✅ Elemento de estado de sincronización creado');
+    }
+    
+    return elemento;
+}
+
+// Actualizar estado visual de sincronización
+function actualizarEstadoSincronizacion(estado) {
+    const elemento = document.getElementById('estado-sincronizacion');
+    if (!elemento) {
+        console.log('⚠️ Elemento de estado no encontrado');
+        return;
+    }
+    
+    elemento.className = 'sincronizacion-estado ' + estado;
+    
+    switch(estado) {
+        case 'sincronizado':
+            elemento.innerHTML = '🟢 Sincronizado';
+            break;
+        case 'sincronizando':
+            elemento.innerHTML = '🟡 Sincronizando...';
+            break;
+        case 'error':
+            elemento.innerHTML = '🔴 Error de sincronización';
+            break;
+        default:
+            elemento.innerHTML = '⚪ Desconocido';
+    }
+    
+    console.log('📡 Estado de sincronización:', estado);
+}
+
+// Escuchar cambios en tiempo real de Supabase
+function escucharCambiosEnTiempoReal() {
+    console.log('👂 Iniciando escucha de cambios en tiempo real...');
+    
+    try {
+        const subscription = supabase
+            .channel('event-changes')
+            .on('postgres_changes', 
+                { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'event_data',
+                    filter: 'id=eq.main'
+                }, 
+                async (payload) => {
+                    console.log('🔄 Cambio en tiempo real detectado:', payload.eventType);
+                    actualizarEstadoSincronizacion('sincronizando');
+                    
+                    if (payload.new) {
+                        const nuevosClientes = payload.new.clientes || [];
+                        const nuevosCodigos = payload.new.codigos_usados || [];
+                        
+                        console.log('📥 Actualizando desde tiempo real:');
+                        console.log('- Clientes:', nuevosClientes.length);
+                        console.log('- Códigos:', nuevosCodigos.length);
+                        
+                        // Actualizar datos locales
+                        clientes = nuevosClientes;
+                        codigosUsados = nuevosCodigos;
+                        
+                        localStorage.setItem('clientes', JSON.stringify(clientes));
+                        localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
+                        
+                        actualizarInterfaz();
+                        console.log('✅ Base de datos actualizada desde cambios en tiempo real');
+                    }
+                    
+                    actualizarEstadoSincronizacion('sincronizado');
+                }
+            )
+            .subscribe((status) => {
+                console.log('📡 Estado de suscripción en tiempo real:', status);
+            });
+
+        return subscription;
+        
+    } catch (error) {
+        console.error('❌ Error en escucha de tiempo real:', error);
+        return null;
+    }
+}
+
+// Crear documento inicial en Supabase si no existe
+async function crearDocumentoInicial() {
+    try {
+        console.log('📝 Creando documento inicial en Supabase...');
+        
+        const { data, error } = await supabase
+            .from('event_data')
+            .insert([
+                {
+                    id: 'main',
+                    clientes: clientes,
+                    codigos_usados: codigosUsados,
+                    ultima_actualizacion: new Date().toISOString()
+                }
+            ])
+            .select();
+
+        if (error) {
+            console.error('❌ Error creando documento inicial:', error);
+            throw error;
+        }
+
+        console.log('✅ Documento inicial creado en Supabase');
+        return data;
+        
+    } catch (error) {
+        console.error('💥 Error creando documento inicial:', error);
+        throw error;
+    }
+}
+
+// Actualizar interfaz después de sincronización
+function actualizarInterfaz() {
+    console.log('🎨 Actualizando interfaz después de sincronización...');
+    
+    actualizarEstadisticas();
+    
+    // Si estamos en la sección de gestión, actualizar lista
+    const gestionarSection = document.getElementById('gestionar-section');
+    if (gestionarSection && gestionarSection.classList.contains('active')) {
+        cargarListaClientes();
+    }
+    
+    // Si estamos en la sección de ingresar, actualizar QR si es necesario
+    const ingresarSection = document.getElementById('ingresar-section');
+    if (ingresarSection && ingresarSection.classList.contains('active') && clientes.length > 0) {
+        const ultimoCliente = clientes[clientes.length - 1];
+        if (!codigosUsados.includes(ultimoCliente.identificacion)) {
+            generarQR(ultimoCliente.identificacion);
+            const qrMessage = document.getElementById('qr-message');
+            if (qrMessage) {
+                qrMessage.textContent = `QR para: ${ultimoCliente.nombre} (Activo)`;
+                qrMessage.style.color = '';
+            }
+        }
+    }
+    
+    console.log('✅ Interfaz actualizada');
+}
+
 // ========== CONFIGURACIÓN DE EVENT LISTENERS SEGURA ==========
 function setupAuthEventListeners() {
     console.log('🔧 Buscando elementos para event listeners...');
@@ -1326,13 +1484,31 @@ async function verificarDatosSupabase() {
 
 async function forzarSincronizacionManual() {
     console.log('🔄 FORZANDO SINCRONIZACIÓN MANUAL...');
-    actualizarEstadoSincronizacion('sincronizando');
     
     try {
+        // Actualizar estado visual
+        actualizarEstadoSincronizacion('sincronizando');
+        
+        // 1. Subir cambios locales a Supabase
         await subirCambiosASupabase();
+        
+        // 2. Pequeña pausa para asegurar que se subió
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // 3. Descargar datos más recientes de Supabase
         await cargarDatosIniciales();
-        alert('✅ Sincronización manual completada');
+        
+        // 4. Actualizar interfaz
+        actualizarInterfaz();
+        
+        // Mostrar confirmación
+        alert(`✅ Sincronización manual completada\n\n• ${clientes.length} clientes sincronizados\n• ${codigosUsados.length} códigos sincronizados`);
+        
+        console.log('✅ Sincronización manual exitosa');
+        
     } catch (error) {
-        alert('❌ Error en sincronización manual');
+        console.error('❌ Error en sincronización manual:', error);
+        actualizarEstadoSincronizacion('error');
+        alert('❌ Error en sincronización manual. Revisa la consola para más detalles.');
     }
 }

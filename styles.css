@@ -407,7 +407,7 @@ body {
     }
 }
 
-/* Resto de estilos de sincronización y animaciones se mantienen igual */
+/* ESTADO DE SINCRONIZACIÓN */
 .sincronizacion-estado {
     position: fixed;
     bottom: 15px;
@@ -420,6 +420,36 @@ body {
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
     z-index: 1000;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.sincronizacion-estado.sincronizado {
+    background: #10b981;
+    color: white;
+}
+
+.sincronizacion-estado.sincronizando {
+    background: #f59e0b;
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+.sincronizacion-estado.error {
+    background: #ef4444;
+    color: white;
+    animation: shake 0.5s;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
 }
 
 @keyframes scan-line {
@@ -490,3 +520,4 @@ body {
     color: white;
     border: none;
 }
+
