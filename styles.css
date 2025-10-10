@@ -31,10 +31,25 @@ body {
     overflow-x: hidden;
 }
 
+/* CORRECCIONES CRÍTICAS */
+.screen {
+    display: none;
+}
+
+#login-screen {
+    display: flex;
+    min-height: 100vh;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+}
+
+#app-container {
+    display: none;
+}
+
 /* UTILIDADES */
 .hidden { display: none !important; }
-.screen { min-height: 100vh; }
-.screen.active { display: block; }
 
 .container {
     padding: 20px;
@@ -43,10 +58,6 @@ body {
 }
 
 /* LOGIN SCREEN */
-#login-screen { 
-    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); 
-}
-
 .logo {
     font-size: 3.5rem;
     font-weight: 900;
@@ -72,6 +83,7 @@ body {
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     border: 1px solid var(--border);
+    transition: all 0.3s ease;
 }
 
 .form-title {
@@ -306,6 +318,10 @@ body {
     margin-bottom: 20px;
 }
 
+.qr-message.success {
+    color: var(--success);
+}
+
 .qr-container {
     display: flex;
     justify-content: center;
@@ -345,6 +361,11 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    border-radius: var(--radius);
+}
+
+.scanner-canvas {
+    display: none;
 }
 
 .camera-placeholder {
@@ -389,6 +410,7 @@ body {
     border-radius: var(--radius);
     text-align: center;
     margin-top: 20px;
+    transition: all 0.3s ease;
 }
 
 .result-card.success {
@@ -490,10 +512,16 @@ body {
     margin-bottom: 15px;
     border-radius: var(--radius);
     border-left: 4px solid var(--primary);
+    transition: all 0.3s ease;
 }
 
 .client-item.used {
     border-left-color: var(--danger);
+}
+
+.client-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
 .client-info h4 {
@@ -556,17 +584,22 @@ body {
     right: 20px;
     background: var(--warning);
     color: white;
-    padding: 10px 15px;
+    padding: 12px 18px;
     border-radius: var(--radius);
-    font-size: 0.9rem;
-    font-weight: 500;
-    z-index: 1001;
+    font-weight: 600;
+    z-index: 10000;
     box-shadow: var(--shadow);
+    animation: slideIn 0.3s ease;
 }
 
 .sync-status.syncing { background: var(--warning); }
 .sync-status.success { background: var(--success); }
 .sync-status.error { background: var(--danger); }
+
+@keyframes slideIn {
+    from { transform: translateX(100px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
 
 /* MENSAJES */
 .message {
