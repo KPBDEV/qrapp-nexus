@@ -284,6 +284,7 @@ function setupMainEventListeners() {
         'btn-stop-camera': (el) => el.addEventListener('click', stopCamera),
         'btn-buscar': (el) => el.addEventListener('click', buscarClientes),
         'btn-autorizar-reingreso': (el) => el.addEventListener('click', autorizarReingreso),
+        'btn-limpiar-db': (el) => el.addEventListener('click', limpiarBaseDatos),
         'buscar-cliente': (el) => el.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') buscarClientes();
         })
@@ -971,5 +972,52 @@ async function autorizarReingresoCliente(identificacion) {
         }
     } else {
         console.log('❌ Reingreso cancelado por el usuario');
+    }
+}
+
+async function limpiarBaseDatos() {
+    console.log('🗑️ Iniciando limpieza de base de datos...');
+    
+    const confirmacion = confirm(`⚠️ ¿ESTÁS ABSOLUTAMENTE SEGURO?\n\nEsta acción:\n• Eliminará TODOS los clientes (${clientes.length} registros)\n• Eliminará TODOS los códigos usados (${codigosUsados.length} códigos)\n• No se puede deshacer\n\n¿Continuar?`);
+    
+    if (!confirmacion) {
+        console.log('❌ Limpieza cancelada por el usuario');
+        return;
+    }
+    
+    try {
+        // 1. Limpiar variables locales
+        clientes = [];
+        codigosUsados = [];
+        
+        // 2. Limpiar localStorage
+        localStorage.removeItem('clientes');
+        localStorage.removeItem('codigosUsados');
+        
+        // 3. Limpiar interfaz
+        const qrcodeElement = document.getElementById('qrcode');
+        const qrMessage = document.getElementById('qr-message');
+        
+        if (qrcodeElement) qrcodeElement.innerHTML = '';
+        if (qrMessage) {
+            qrMessage.textContent = 'El código QR aparecerá aquí después de ingresar los datos';
+            qrMessage.style.color = '';
+        }
+        
+        // 4. Actualizar estadísticas
+        actualizarEstadisticas();
+        cargarListaClientes();
+        
+        // 5. Limpiar Supabase
+        await subirCambiosASupabase();
+        
+        // 6. Mostrar confirmación
+        alert(`✅ Base de datos limpiada completamente\n\n• ${clientes.length} clientes registrados\n• ${codigosUsados.length} códigos usados`);
+        
+        console.log('✅ Base de datos limpiada exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error limpiando base de datos:', error);
+        alert('❌ Error al limpiar la base de datos. Revisa la consola para más detalles.');
     }
 }
