@@ -213,30 +213,63 @@ function showApp() {
 
 // Configurar event listeners de auth
 function setupAuthEventListeners() {
+    console.log('🔧 Configurando event listeners...');
+    
+    // Prevenir envío de formularios por defecto
+    loginForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        console.log('📝 Formulario login prevenido');
+    });
+
+    if (registerForm) {
+        registerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            console.log('📝 Formulario registro prevenido');
+        });
+    }
+    
     btnShowRegister.addEventListener('click', () => {
+        console.log('🔄 Mostrar registro');
         loginForm.style.display = 'none';
         registerForm.style.display = 'block';
         loginMessage.style.display = 'none';
     });
 
     btnShowLogin.addEventListener('click', () => {
+        console.log('🔄 Mostrar login');
         registerForm.style.display = 'none';
         loginForm.style.display = 'block';
         loginMessage.style.display = 'none';
     });
 
-    btnLogin.addEventListener('click', handleLogin);
-    btnRegister.addEventListener('click', handleRegister);
+    btnLogin.addEventListener('click', function() {
+        console.log('🎯 Botón login clickeado!');
+        handleLogin();
+    });
+    
+    btnRegister.addEventListener('click', function() {
+        console.log('🎯 Botón registro clickeado!');
+        handleRegister();
+    });
+    
     btnLogout.addEventListener('click', handleLogout);
 
     // Enter key en formularios
     document.getElementById('login-password').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleLogin();
+        if (e.key === 'Enter') {
+            console.log('↵ Enter en password');
+            handleLogin();
+        }
     });
     
     document.getElementById('organizer-code').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleRegister();
+        if (e.key === 'Enter') {
+            console.log('↵ Enter en organizer-code');
+            handleRegister();
+        }
     });
+
+    console.log('✅ Event listeners configurados');
 }
 
 // ========== VARIABLES DE LA APP PRINCIPAL ==========
