@@ -462,3 +462,31 @@ body {
     font-size: 0.8rem;
     margin-top: 8px;
 }
+
+/* BOTÓN OLVIDÉ CONTRASEÑA */
+#btn-olvide-password {
+    background: transparent;
+    border: none;
+    color: #6366f1;
+    text-decoration: underline;
+    padding: 5px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+#btn-olvide-password:hover {
+    color: #8b5cf6;
+    text-decoration: none;
+}
+
+/* FORMULARIO DE RECUPERACIÓN */
+#recover-form {
+    animation: fadeIn 0.5s ease;
+}
+
+#btn-recover-password {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    color: white;
+    border: none;
+}

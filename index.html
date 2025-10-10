@@ -29,6 +29,12 @@
                     <input type="password" id="login-password" class="nexus-input" placeholder="Tu contraseña">
                 </div>
                 
+                <div style="text-align: right; margin-bottom: 15px;">
+                    <button type="button" id="btn-olvide-password" class="nexus-btn" style="background: transparent; border: none; color: #6366f1; text-decoration: underline; padding: 5px; font-size: 0.9rem;">
+                    ¿Olvidaste tu contraseña?
+                    </button>
+                </div>
+
                 <button type="button" id="btn-login" class="nexus-btn nexus-btn-primary" style="width: 100%; margin-bottom: 15px;">
                     Acceder al Sistema
                 </button>
@@ -62,6 +68,38 @@
                 
                 <button type="button" id="btn-show-login" class="nexus-btn" style="width: 100%;">
                     ← Volver al Login
+                </button>
+            </div>
+
+        <div id="recover-form" class="nexus-form-group" style="display: none;">
+            <h3 class="login-title">Recuperar Contraseña</h3>
+    
+            <div class="nexus-form-group">
+                <label class="nexus-label">Usuario</label>
+                <input type="text" id="recover-username" class="nexus-input" placeholder="Tu usuario">
+            </div>  
+    
+            <div class="nexus-form-group">
+                <label class="nexus-label">Código de Organizador</label>
+                <input type="password" id="recover-organizer-code" class="nexus-input" placeholder="Código verificador">
+            </div>
+    
+            <div class="nexus-form-group">
+                <label class="nexus-label">Nueva Contraseña</label>
+                <input type="password" id="new-password" class="nexus-input" placeholder="Mínimo 6 caracteres">
+            </div>
+    
+            <div class="nexus-form-group">
+                <label class="nexus-label">Confirmar Nueva Contraseña</label>
+                <input type="password" id="confirm-password" class="nexus-input" placeholder="Repite la contraseña">
+                </div>
+    
+                <button type="button" id="btn-recover-password" class="nexus-btn nexus-btn-warning" style="width: 100%; margin-bottom: 15px;">
+                Restablecer Contraseña
+                </button>
+    
+                <button type="button" id="btn-show-login-from-recover" class="nexus-btn" style="width: 100%;">
+                ← Volver al Login
                 </button>
             </div>
 

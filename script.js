@@ -151,7 +151,10 @@ function setupAuthEventListeners() {
     const btnLogin = document.getElementById('btn-login');
     const btnRegister = document.getElementById('btn-register');
     const btnLogout = document.getElementById('btn-logout');
-    
+    const btnOlvidePassword = document.getElementById('btn-olvide-password'); 
+    const btnRecoverPassword = document.getElementById('btn-recover-password'); 
+    const btnShowLoginFromRecover = document.getElementById('btn-show-login-from-recover');
+
     console.log('Elementos encontrados:', {
         btnShowRegister: !!btnShowRegister,
         btnShowLogin: !!btnShowLogin,
@@ -160,7 +163,6 @@ function setupAuthEventListeners() {
         btnLogout: !!btnLogout
     });
     
-    // Configurar solo los elementos que existen
     if (btnShowRegister) {
         btnShowRegister.addEventListener('click', () => {
             document.getElementById('login-form').style.display = 'none';
@@ -197,10 +199,29 @@ function setupAuthEventListeners() {
         btnLogout.addEventListener('click', handleLogout);
     }
 
+    if (btnOlvidePassword) {
+        btnOlvidePassword.addEventListener('click', showRecoverForm);
+    } else {
+        console.error('❌ btn-olvide-password no encontrado');
+    }
+
+    if (btnRecoverPassword) {
+        btnRecoverPassword.addEventListener('click', handlePasswordRecovery);
+    } else {
+        console.error('❌ btn-recover-password no encontrado');
+    }
+
+    if (btnShowLoginFromRecover) {
+        btnShowLoginFromRecover.addEventListener('click', showLoginFormFromRecover);
+    } else {
+        console.error('❌ btn-show-login-from-recover no encontrado');
+    }
+
     // Enter key listeners
     const loginPassword = document.getElementById('login-password');
     const organizerCode = document.getElementById('organizer-code');
-    
+    const confirmPassword = document.getElementById('confirm-password');
+
     if (loginPassword) {
         loginPassword.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleLogin();
@@ -210,6 +231,12 @@ function setupAuthEventListeners() {
     if (organizerCode) {
         organizerCode.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') handleRegister();
+        });
+    }
+
+    if (confirmPassword) {
+        confirmPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handlePasswordRecovery();
         });
     }
 
@@ -1020,4 +1047,120 @@ async function limpiarBaseDatos() {
         console.error('❌ Error limpiando base de datos:', error);
         alert('❌ Error al limpiar la base de datos. Revisa la consola para más detalles.');
     }
+}
+
+// ========== SISTEMA DE RECUPERACIÓN DE CONTRASEÑA ==========
+
+// Mostrar formulario de recuperación
+function showRecoverForm() {
+    console.log('🔐 Mostrando formulario de recuperación...');
+    
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const recoverForm = document.getElementById('recover-form');
+    const loginMessage = document.getElementById('login-message');
+    
+    if (loginForm) loginForm.style.display = 'none';
+    if (registerForm) registerForm.style.display = 'none';
+    if (recoverForm) recoverForm.style.display = 'block';
+    if (loginMessage) loginMessage.style.display = 'none';
+}
+
+// Manejar recuperación de contraseña
+async function handlePasswordRecovery() {
+    console.log('🔄 Procesando recuperación de contraseña...');
+    
+    const username = document.getElementById('recover-username')?.value.trim();
+    const organizerCode = document.getElementById('recover-organizer-code')?.value.trim();
+    const newPassword = document.getElementById('new-password')?.value.trim();
+    const confirmPassword = document.getElementById('confirm-password')?.value.trim();
+
+    // Validaciones
+    if (!username || !organizerCode || !newPassword || !confirmPassword) {
+        showAuthMessage('Por favor completa todos los campos', 'error');
+        return;
+    }
+
+    if (organizerCode !== ORGANIZER_CODE) {
+        showAuthMessage('Código de organizador incorrecto', 'error');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showAuthMessage('La nueva contraseña debe tener al menos 6 caracteres', 'error');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        showAuthMessage('Las contraseñas no coinciden', 'error');
+        return;
+    }
+
+    try {
+        showAuthMessage('Verificando usuario...', 'info');
+
+        // Buscar usuario en Supabase
+        const { data: user, error } = await supabase
+            .from('nexus_usuarios')
+            .select('*')
+            .eq('username', username)
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                showAuthMessage('Usuario no encontrado', 'error');
+            } else {
+                showAuthMessage('Error de conexión: ' + error.message, 'error');
+            }
+            return;
+        }
+
+        // Actualizar contraseña
+        const passwordHash = hashPassword(newPassword);
+        const { error: updateError } = await supabase
+            .from('nexus_usuarios')
+            .update({ password_hash: passwordHash })
+            .eq('username', username);
+
+        if (updateError) {
+            showAuthMessage('Error al actualizar la contraseña: ' + updateError.message, 'error');
+            return;
+        }
+
+        showAuthMessage('✅ Contraseña restablecida exitosamente. Ahora puedes iniciar sesión.', 'success');
+        
+        // Volver al login después de 3 segundos
+        setTimeout(() => {
+            showLoginFormFromRecover();
+            
+            // Llenar automáticamente el usuario
+            document.getElementById('login-username').value = username;
+            document.getElementById('login-password').value = '';
+            
+            // Limpiar formulario de recuperación
+            document.getElementById('recover-username').value = '';
+            document.getElementById('recover-organizer-code').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+        }, 3000);
+
+    } catch (error) {
+        console.error('Error en recuperación:', error);
+        showAuthMessage('Error de conexión con el servidor', 'error');
+    }
+}
+
+// Volver al login desde recuperación
+function showLoginFormFromRecover() {
+    console.log('🔙 Volviendo al login desde recuperación...');
+    
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const recoverForm = document.getElementById('recover-form');
+    const loginMessage = document.getElementById('login-message');
+    
+    if (loginForm) loginForm.style.display = 'block';
+    if (registerForm) registerForm.style.display = 'none';
+    if (recoverForm) recoverForm.style.display = 'none';
+    if (loginMessage) loginMessage.style.display = 'none';
 }
