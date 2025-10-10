@@ -191,8 +191,34 @@ function showAuthMessage(text, type) {
 function initApp() {
     console.log('🚀 Inicializando aplicación NEXUS...');
     
+    // Esperar a que el DOM esté completamente listo
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+    } else {
+        initializeApp();
+    }
+}
+
+function initializeApp() {
+    console.log('🔍 Inicializando elementos DOM...');
+    
     // Inicializar elementos DOM
     initializeDOMElements();
+    
+    // Verificar que todos los elementos críticos existen
+    if (!btnLogin || !btnShowRegister || !loginForm) {
+        console.error('❌ Elementos críticos no encontrados:', {
+            btnLogin: !!btnLogin,
+            btnShowRegister: !!btnShowRegister,
+            loginForm: !!loginForm
+        });
+        
+        // Reintentar después de un breve delay
+        setTimeout(initializeApp, 100);
+        return;
+    }
     
     // Configurar event listeners
     setupAuthEventListeners();
@@ -205,7 +231,7 @@ function initApp() {
 
 // Inicializar elementos DOM
 function initializeDOMElements() {
-    console.log('🔍 Inicializando elementos DOM...');
+    console.log('🔍 Buscando elementos DOM...');
     
     loginScreen = document.getElementById('login-screen');
     appContainer = document.getElementById('app-container');
@@ -219,25 +245,33 @@ function initializeDOMElements() {
     userWelcome = document.getElementById('user-welcome');
     loginMessage = document.getElementById('login-message');
     
-    console.log('📋 Elementos cargados:', {
+    console.log('📋 Estado de elementos:', {
         loginScreen: !!loginScreen,
-        appContainer: !!appContainer,
+        appContainer: !!appContainer, 
         loginForm: !!loginForm,
         registerForm: !!registerForm,
         btnShowRegister: !!btnShowRegister,
         btnShowLogin: !!btnShowLogin,
         btnLogin: !!btnLogin,
         btnRegister: !!btnRegister,
-        btnLogout: !!btnLogout
+        btnLogout: !!btnLogout,
+        userWelcome: !!userWelcome,
+        loginMessage: !!loginMessage
     });
+    
+    // Si faltan elementos críticos, mostrar error específico
+    if (!btnLogin) console.error('❌ ERROR: btnLogin no encontrado');
+    if (!btnShowRegister) console.error('❌ ERROR: btnShowRegister no encontrado');
+    if (!loginForm) console.error('❌ ERROR: loginForm no encontrado');
 }
 
 // Configurar event listeners de auth
 function setupAuthEventListeners() {
     console.log('🔧 Configurando event listeners...');
     
-    if (!btnLogin) {
-        console.error('❌ btnLogin no encontrado!');
+    // Verificar que los elementos existen antes de agregar listeners
+    if (!btnLogin || !btnShowRegister || !loginForm) {
+        console.error('❌ No se pueden configurar event listeners - elementos faltantes');
         return;
     }
     
@@ -256,32 +290,42 @@ function setupAuthEventListeners() {
         });
     }
     
-    // Configurar botones
-    btnShowRegister.addEventListener('click', () => {
-        console.log('🔄 Mostrar registro');
-        loginForm.style.display = 'none';
-        registerForm.style.display = 'block';
-        loginMessage.style.display = 'none';
-    });
+    // Configurar botones con verificaciones
+    if (btnShowRegister) {
+        btnShowRegister.addEventListener('click', () => {
+            console.log('🔄 Mostrar registro');
+            if (loginForm) loginForm.style.display = 'none';
+            if (registerForm) registerForm.style.display = 'block';
+            if (loginMessage) loginMessage.style.display = 'none';
+        });
+    }
 
-    btnShowLogin.addEventListener('click', () => {
-        console.log('🔄 Mostrar login');
-        registerForm.style.display = 'none';
-        loginForm.style.display = 'block';
-        loginMessage.style.display = 'none';
-    });
+    if (btnShowLogin) {
+        btnShowLogin.addEventListener('click', () => {
+            console.log('🔄 Mostrar login');
+            if (registerForm) registerForm.style.display = 'none';
+            if (loginForm) loginForm.style.display = 'block';
+            if (loginMessage) loginMessage.style.display = 'none';
+        });
+    }
 
-    btnLogin.addEventListener('click', function() {
-        console.log('🎯 Botón login clickeado!');
-        handleLogin();
-    });
+    if (btnLogin) {
+        btnLogin.addEventListener('click', function() {
+            console.log('🎯 Botón login clickeado!');
+            handleLogin();
+        });
+    }
     
-    btnRegister.addEventListener('click', function() {
-        console.log('🎯 Botón registro clickeado!');
-        handleRegister();
-    });
+    if (btnRegister) {
+        btnRegister.addEventListener('click', function() {
+            console.log('🎯 Botón registro clickeado!');
+            handleRegister();
+        });
+    }
     
-    btnLogout.addEventListener('click', handleLogout);
+    if (btnLogout) {
+        btnLogout.addEventListener('click', handleLogout);
+    }
 
     // Enter key en formularios
     const loginPassword = document.getElementById('login-password');
@@ -305,7 +349,7 @@ function setupAuthEventListeners() {
         });
     }
 
-    console.log('✅ Event listeners configurados');
+    console.log('✅ Event listeners configurados correctamente');
 }
 
 // Verificar estado de autenticación

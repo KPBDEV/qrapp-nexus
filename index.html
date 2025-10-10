@@ -16,7 +16,7 @@
             <div class="nexus-logo">NEXUS</div>
             <p class="login-subtitle">Gestión Profesional de Eventos</p>
             
-            <div id="login-form" class="nexus-form-group">
+            <form id="login-form" class="nexus-form-group">
                 <h3 class="login-title">Iniciar Sesión</h3>
                 
                 <div class="nexus-form-group">
@@ -30,20 +30,13 @@
                 </div>
                 
                 <button type="button" id="btn-login" class="nexus-btn nexus-btn-primary" style="width: 100%; margin-bottom: 15px;">
-                 Acceder al Sistema
+                    Acceder al Sistema
                 </button>
-
+                
                 <button type="button" id="btn-show-register" class="nexus-btn" style="width: 100%;">
-                 Crear Cuenta Nueva
+                    Crear Cuenta Nueva
                 </button>
-
-                <button type="button" id="btn-register" class="nexus-btn nexus-btn-success" style="width: 100%; margin-bottom: 15px;">
-                 Crear Cuenta
-                </button>
-
-                <button type="button" id="btn-show-login" class="nexus-btn" style="width: 100%;">
-                 Volver al Login
-                </button>
+            </form>
 
             <div id="register-form" class="nexus-form-group" style="display: none;">
                 <h3 class="login-title">Crear Cuenta</h3>
@@ -63,11 +56,11 @@
                     <input type="password" id="organizer-code" class="nexus-input" placeholder="Código verificador">
                 </div>
                 
-                <button id="btn-register" class="nexus-btn nexus-btn-success" style="width: 100%; margin-bottom: 15px;">
+                <button type="button" id="btn-register" class="nexus-btn nexus-btn-success" style="width: 100%; margin-bottom: 15px;">
                     Crear Cuenta
                 </button>
                 
-                <button id="btn-show-login" class="nexus-btn" style="width: 100%;">
+                <button type="button" id="btn-show-login" class="nexus-btn" style="width: 100%;">
                     ← Volver al Login
                 </button>
             </div>
