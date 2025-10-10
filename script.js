@@ -481,12 +481,103 @@ function autorizarReingreso() {
 }
 
 // Funciones de cámara básicas
-function startCamera() {
-    alert('Cámara activada (funcionalidad básica)');
+async function startCamera() {
+    try {
+        stopCamera();
+        
+        console.log('🎥 Iniciando cámara...');
+        
+        const constraints = {
+            video: { 
+                facingMode: "environment",
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 24 }
+            } 
+        };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // CONFIGURAR VIDEO PRINCIPAL
+        const video = document.getElementById('video');
+        const cameraPlaceholder = document.getElementById('camera-placeholder');
+        const canvas = document.getElementById('canvas');
+        const btnStartCamera = document.getElementById('btn-start-camera');
+        const btnStopCamera = document.getElementById('btn-stop-camera');
+        
+        video.srcObject = stream;
+        video.style.display = 'block';
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'cover';
+        
+        // OCULTAR ELEMENTOS QUE CAUSAN DUPLICACIÓN
+        if (cameraPlaceholder) cameraPlaceholder.style.display = 'none';
+        if (canvas) canvas.style.display = 'none';
+        
+        if (btnStartCamera) btnStartCamera.style.display = 'none';
+        if (btnStopCamera) btnStopCamera.style.display = 'inline-block';
+        
+        // AGREGAR OVERLAY CON TRANSPARENCIA
+        agregarOverlayConTransparencia();
+        
+        video.addEventListener('loadedmetadata', () => {
+            video.play().then(() => {
+                console.log('✅ Video listo, iniciando escaneo...');
+                // Configurar canvas EN MEMORIA (no visible)
+                if (canvas) {
+                    canvas.width = 320;
+                    canvas.height = 240;
+                }
+                startQRScanning();
+            });
+        });
+        
+    } catch (err) {
+        console.error('Error al acceder a la cámara:', err);
+        const cameraPlaceholder = document.getElementById('camera-placeholder');
+        if (cameraPlaceholder) {
+            cameraPlaceholder.innerHTML = '❌ Error: ' + err.message;
+            cameraPlaceholder.style.display = 'block';
+        }
+    }
 }
 
 function stopCamera() {
-    // Implementación básica
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    if (animationFrame) {
+        clearTimeout(animationFrame);
+        animationFrame = null;
+    }
+    
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const cameraPlaceholder = document.getElementById('camera-placeholder');
+    const btnStartCamera = document.getElementById('btn-start-camera');
+    const btnStopCamera = document.getElementById('btn-stop-camera');
+    
+    if (video) {
+        video.srcObject = null;
+        video.style.display = 'none';
+    }
+    if (canvas) canvas.style.display = 'none';
+    if (cameraPlaceholder) {
+        cameraPlaceholder.style.display = 'block';
+        cameraPlaceholder.textContent = 'Cámara no activada';
+    }
+    if (btnStartCamera) btnStartCamera.style.display = 'inline-block';
+    if (btnStopCamera) btnStopCamera.style.display = 'none';
+    
+    scanning = false;
+    
+    // Remover overlay
+    const overlay = document.getElementById('scan-overlay');
+    if (overlay) {
+        overlay.remove();
+    }
 }
 
 // Inicialización de sincronización
@@ -496,3 +587,82 @@ async function iniciarSincronizacionAutomatica() {
     console.log('🔄 Sincronización iniciada');
     await subirCambiosASupabase();
 }
+
+function agregarOverlayConTransparencia() {
+    const existingOverlay = document.getElementById('scan-overlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'scan-overlay';
+    overlay.innerHTML = `
+        <div class="overlay-mask"></div>
+        <div class="scan-frame"></div>
+        <div class="scan-line"></div>
+        <div class="scan-text">Enfoca el código QR en el marco</div>
+    `;
+    
+    const scanner = document.getElementById('scanner');
+    if (scanner) {
+        scanner.appendChild(overlay);
+    }
+}
+
+function scanQRCode() {
+    if (!scanning || !stream) return;
+    
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    
+    if (video && video.readyState === video.HAVE_ENOUGH_DATA && canvas) {
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        
+        // DIBUJAR FRAME REDUCIDO (más rápido)
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        
+        try {
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: "dontInvert",
+            });
+            
+            if (code) {
+                console.log('✅ QR detectado instantáneamente:', code.data);
+                verificarCodigo(code.data);
+                stopCamera();
+                // Mostrar feedback visual
+                mostrarFeedbackQRDetectado();
+                return;
+            }
+        } catch (error) {
+            // Silenciar errores de escaneo
+        }
+    }
+    
+    if (scanning) {
+        // ESCANEAR CADA 150ms (no continuo) - MENOS LAG
+        animationFrame = setTimeout(() => {
+            requestAnimationFrame(scanQRCode);
+        }, 150);
+    }
+}
+
+function startQRScanning() {
+    scanning = true;
+    scanQRCode();
+}
+
+function mostrarFeedbackQRDetectado() {
+    const overlay = document.getElementById('scan-overlay');
+    if (overlay) {
+        overlay.innerHTML = `
+            <div class="scan-success">✅ QR DETECTADO</div>
+        `;
+        setTimeout(() => {
+            if (overlay) overlay.remove();
+        }, 2000);
+    }
+}
+
