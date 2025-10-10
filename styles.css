@@ -220,6 +220,67 @@ body {
     border-left-color: var(--nexus-danger);
 }
 
+.cliente-info {
+    flex: 1;
+    min-width: 250px;
+}
+
+.cliente-info h4 {
+    margin: 0 0 8px 0;
+    color: var(--nexus-text);
+    font-size: 1.1rem;
+}
+
+.cliente-info p {
+    margin: 4px 0;
+    color: var(--nexus-text-secondary);
+    font-size: 0.9rem;
+}
+
+.estado-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.estado-activo {
+    background: var(--nexus-success);
+    color: white;
+}
+
+.estado-usado {
+    background: var(--nexus-danger);
+    color: white;
+}
+
+.btn-reingresar {
+    background: var(--nexus-warning);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.btn-reingresar:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.no-clientes {
+    text-align: center;
+    padding: 40px;
+    color: var(--nexus-text-secondary);
+    font-style: italic;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+
 /* OVERLAY CÁMARA */
 #scan-overlay {
     position: absolute;
@@ -334,6 +395,15 @@ body {
     
     .scan-line {
         width: 180px;
+    }
+
+    .cliente-actions {
+        align-items: flex-start;
+        width: 100%;
+    }
+    
+    .btn-reingresar {
+        width: 100%;
     }
 }
 

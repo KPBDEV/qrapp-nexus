@@ -492,12 +492,64 @@ function actualizarEstadisticas() {
 }
 
 function cargarListaClientes(filtro = '') {
-    const listaClientes = document.getElementById('lista-clientes');
-    if (!listaClientes) return;
+    console.log('📋 Cargando lista de clientes...');
     
-    listaClientes.innerHTML = '<div class="no-clientes">Funcionalidad de lista cargada</div>';
+    const listaClientes = document.getElementById('lista-clientes');
+    if (!listaClientes) {
+        console.error('❌ Elemento lista-clientes no encontrado');
+        return;
+    }
+    
+    // Limpiar lista
+    listaClientes.innerHTML = '';
+    
+    // Filtrar clientes si hay búsqueda
+    let clientesFiltrados = clientes;
+    
+    if (filtro) {
+        const filtroLower = filtro.toLowerCase();
+        clientesFiltrados = clientes.filter(cliente => 
+            cliente.nombre.toLowerCase().includes(filtroLower) ||
+            cliente.identificacion.includes(filtro)
+        );
+        console.log(`🔍 ${clientesFiltrados.length} clientes encontrados con filtro: "${filtro}"`);
+    } else {
+        console.log(`📊 Mostrando todos los ${clientes.length} clientes`);
+    }
+    
+    // Mostrar mensaje si no hay clientes
+    if (clientesFiltrados.length === 0) {
+        listaClientes.innerHTML = '<div class="no-clientes">No se encontraron clientes</div>';
+        return;
+    }
+    
+    // Crear elementos para cada cliente
+    clientesFiltrados.forEach(cliente => {
+        const usado = codigosUsados.includes(cliente.identificacion);
+        const item = document.createElement('div');
+        item.className = `nexus-client-item ${usado ? 'usado' : ''}`;
+        
+        item.innerHTML = `
+            <div class="cliente-info">
+                <h4>${cliente.nombre}</h4>
+                <p><strong>ID:</strong> ${cliente.identificacion}</p>
+                <p><strong>Teléfono:</strong> ${cliente.telefono}</p>
+                <p><strong>Registro:</strong> ${new Date(cliente.fechaRegistro).toLocaleString()}</p>
+                ${usado ? `<p><strong>Último ingreso:</strong> ${cliente.fechaUso ? new Date(cliente.fechaUso).toLocaleString() : 'Fecha no registrada'}</p>` : ''}
+            </div>
+            <div class="cliente-actions">
+                <span class="estado-badge ${usado ? 'estado-usado' : 'estado-activo'}">
+                    ${usado ? '✅ YA INGRESÓ' : '⏳ PENDIENTE'}
+                </span>
+                ${usado ? `<button class="btn-reingresar" onclick="autorizarReingresoCliente('${cliente.identificacion}')">Permitir Reingreso</button>` : ''}
+            </div>
+        `;
+        
+        listaClientes.appendChild(item);
+    });
+    
+    console.log('✅ Lista de clientes cargada correctamente');
 }
-
 function autorizarReingreso() {
     const codigoReingreso = document.getElementById('codigo-reingreso');
     const codigo = codigoReingreso ? codigoReingreso.value.trim() : '';
@@ -866,5 +918,58 @@ function playBeepSound() {
         oscillator.stop(audioContext.currentTime + 0.5);
     } catch (error) {
         console.log('Audio no disponible');
+    }
+}
+
+async function autorizarReingresoCliente(identificacion) {
+    console.log('🔄 Intentando autorizar reingreso para:', identificacion);
+    
+    const cliente = clientes.find(c => c.identificacion === identificacion);
+    
+    if (!cliente) {
+        alert('❌ Cliente no encontrado');
+        return;
+    }
+    
+    if (!codigosUsados.includes(identificacion)) {
+        alert('ℹ️ Este cliente aún no ha ingresado por primera vez');
+        return;
+    }
+    
+    const confirmar = confirm(`¿Autorizar reingreso para ${cliente.nombre} (${identificacion})?\n\nEl cliente podrá ingresar nuevamente al evento.`);
+    
+    if (confirmar) {
+        const index = codigosUsados.indexOf(identificacion);
+        if (index > -1) {
+            // Remover de códigos usados para permitir reingreso
+            codigosUsados.splice(index, 1);
+            localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
+            
+            // Actualizar datos del cliente
+            cliente.reingresoAutorizado = true;
+            cliente.fechaReingreso = new Date().toISOString();
+            localStorage.setItem('clientes', JSON.stringify(clientes));
+            
+            alert(`✅ Reingreso autorizado para ${cliente.nombre}\n\nAhora puede ingresar nuevamente al evento.`);
+            
+            // Actualizar interfaz
+            actualizarEstadisticas();
+            
+            // Recargar la lista manteniendo el filtro actual
+            const buscarCliente = document.getElementById('buscar-cliente');
+            const filtroActual = buscarCliente ? buscarCliente.value.trim() : '';
+            cargarListaClientes(filtroActual);
+            
+            // Limpiar input de reingreso
+            const codigoReingreso = document.getElementById('codigo-reingreso');
+            if (codigoReingreso) codigoReingreso.value = '';
+
+            // Sincronizar con Supabase
+            await subirCambiosASupabase();
+            
+            console.log('✅ Reingreso autorizado exitosamente');
+        }
+    } else {
+        console.log('❌ Reingreso cancelado por el usuario');
     }
 }
