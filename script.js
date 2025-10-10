@@ -10,187 +10,220 @@ let clientes = JSON.parse(localStorage.getItem('clientes')) || [];
 let codigosUsados = JSON.parse(localStorage.getItem('codigosUsados')) || [];
 let stream = null, scanning = false;
 
-// ELEMENTOS DEL DOM
-const elements = {
-    // Pantallas
-    'login-screen': () => document.getElementById('login-screen'),
-    'app-container': () => document.getElementById('app-container'),
-    
-    // Forms
-    'login-form': () => document.getElementById('login-form'),
-    'register-form': () => document.getElementById('register-form'),
-    'recover-form': () => document.getElementById('recover-form'),
-    
-    // Inputs login
-    'login-username': () => document.getElementById('login-username'),
-    'login-password': () => document.getElementById('login-password'),
-    'register-username': () => document.getElementById('register-username'),
-    'register-password': () => document.getElementById('register-password'),
-    'organizer-code': () => document.getElementById('organizer-code'),
-    
-    // Inputs app
-    'nombre': () => document.getElementById('nombre'),
-    'identificacion': () => document.getElementById('identificacion'),
-    'telefono': () => document.getElementById('telefono'),
-    'codigo-manual': () => document.getElementById('codigo-manual'),
-    'codigo-reingreso': () => document.getElementById('codigo-reingreso'),
-    'buscar-cliente': () => document.getElementById('buscar-cliente'),
-    
-    // Botones
-    'btn-login': () => document.getElementById('btn-login'),
-    'btn-register': () => document.getElementById('btn-register'),
-    'btn-show-register': () => document.getElementById('btn-show-register'),
-    'btn-show-login': () => document.getElementById('btn-show-login'),
-    'btn-olvide-password': () => document.getElementById('btn-olvide-password'),
-    'btn-show-login-from-recover': () => document.getElementById('btn-show-login-from-recover'),
-    'btn-recover-password': () => document.getElementById('btn-recover-password'),
-    'btn-logout': () => document.getElementById('btn-logout'),
-    
-    // Navegación
-    'btn-ingresar': () => document.getElementById('btn-ingresar'),
-    'btn-verificar': () => document.getElementById('btn-verificar'),
-    'btn-gestionar': () => document.getElementById('btn-gestionar'),
-    
-    // Cámara
-    'btn-start-camera': () => document.getElementById('btn-start-camera'),
-    'btn-stop-camera': () => document.getElementById('btn-stop-camera'),
-    'btn-verificar-manual': () => document.getElementById('btn-verificar-manual'),
-    
-    // Gestión
-    'btn-buscar': () => document.getElementById('btn-buscar'),
-    'btn-autorizar-reingreso': () => document.getElementById('btn-autorizar-reingreso'),
-    'btn-forzar-sincronizacion': () => document.getElementById('btn-forzar-sincronizacion'),
-    'btn-sincronizacion-forzada': () => document.getElementById('btn-sincronizacion-forzada'),
-    'btn-limpiar-db': () => document.getElementById('btn-limpiar-db'),
-    
-    // Display
-    'user-welcome': () => document.getElementById('user-welcome'),
-    'login-message': () => document.getElementById('login-message'),
-    'qr-message': () => document.getElementById('qr-message'),
-    'qrcode': () => document.getElementById('qrcode'),
-    'verification-result': () => document.getElementById('verification-result'),
-    'result-title': () => document.getElementById('result-title'),
-    'result-message': () => document.getElementById('result-message'),
-    'client-details': () => document.getElementById('client-details'),
-    'total-registrados': () => document.getElementById('total-registrados'),
-    'total-ingresaron': () => document.getElementById('total-ingresaron'),
-    'total-pendientes': () => document.getElementById('total-pendientes'),
-    'lista-clientes': () => document.getElementById('lista-clientes'),
-    'sync-status': () => document.getElementById('sync-status'),
-    
-    // Cámara
-    'video': () => document.getElementById('video'),
-    'canvas': () => document.getElementById('canvas'),
-    'camera-placeholder': () => document.getElementById('camera-placeholder'),
-    
-    // Secciones
-    'ingresar-section': () => document.getElementById('ingresar-section'),
-    'verificar-section': () => document.getElementById('verificar-section'),
-    'gestionar-section': () => document.getElementById('gestionar-section')
-};
-
-// FUNCIONES UTILITARIAS
-const $ = (id) => elements[id] ? elements[id]() : null;
-const show = (el) => el && el.classList.remove('hidden');
-const hide = (el) => el && el.classList.add('hidden');
-const toggle = (el) => el && el.classList.toggle('hidden');
-const value = (id) => $(id) ? $(id).value.trim() : '';
-const setValue = (id, val) => { if ($(id)) $(id).value = val; };
-const setText = (id, text) => { if ($(id)) $(id).textContent = text; };
-const setHTML = (id, html) => { if ($(id)) $(id).innerHTML = html; };
-
-// INICIALIZACIÓN
-document.addEventListener('DOMContentLoaded', () => {
+// INICIALIZAR APP
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Iniciando NEXUS...');
     setupEventListeners();
     checkAuthStatus();
 });
 
-// AUTENTICACIÓN
-function hashPassword(p) { return btoa(unescape(encodeURIComponent(p))); }
+// ========== AUTENTICACIÓN ==========
+function hashPassword(p) { 
+    return btoa(unescape(encodeURIComponent(p))); 
+}
 
 async function handleLogin() {
-    const username = value('login-username'), password = value('login-password');
-    if (!username || !password) return showMessage('Completa todos los campos', 'error');
-
-    showMessage('Verificando...', 'info');
-    const { data, error } = await supabase.from('nexus_usuarios').select('*').eq('username', username).single();
+    const username = getValue('login-username');
+    const password = getValue('login-password');
     
-    if (error) return showMessage('Usuario no encontrado', 'error');
-    if (data.password_hash === hashPassword(password)) {
-        usuarioActual = { id: data.id, username: data.username };
-        sessionStorage.setItem('nexus_usuario_actual', JSON.stringify(usuarioActual));
-        showApp();
-        showMessage('¡Bienvenido!', 'success');
-    } else {
-        showMessage('Contraseña incorrecta', 'error');
+    if (!username || !password) {
+        showMessage('Completa todos los campos', 'error');
+        return;
+    }
+
+    showMessage('Verificando credenciales...', 'info');
+    
+    try {
+        const { data, error } = await supabase
+            .from('nexus_usuarios')
+            .select('*')
+            .eq('username', username)
+            .single();
+
+        if (error) {
+            showMessage('Usuario no encontrado', 'error');
+            return;
+        }
+
+        if (data.password_hash === hashPassword(password)) {
+            usuarioActual = { 
+                id: data.id, 
+                username: data.username,
+                fechaRegistro: data.fecha_registro
+            };
+            
+            sessionStorage.setItem('nexus_usuario_actual', JSON.stringify(usuarioActual));
+            showApp();
+            showMessage('¡Bienvenido!', 'success');
+        } else {
+            showMessage('Contraseña incorrecta', 'error');
+        }
+    } catch (error) {
+        showMessage('Error de conexión', 'error');
+        console.error('Login error:', error);
     }
 }
 
 async function handleRegister() {
-    const username = value('register-username'), password = value('register-password'), code = value('organizer-code');
-    if (!username || !password || !code) return showMessage('Completa todos los campos', 'error');
-    if (password.length < 6) return showMessage('Contraseña muy corta', 'error');
-    if (code !== ORGANIZER_CODE) return showMessage('Código incorrecto', 'error');
-
-    showMessage('Creando cuenta...', 'info');
-    const { data: existing } = await supabase.from('nexus_usuarios').select('username').eq('username', username);
-    if (existing?.length > 0) return showMessage('Usuario ya existe', 'error');
-
-    const { error } = await supabase.from('nexus_usuarios').insert([{ username, password_hash: hashPassword(password) }]);
-    if (error) return showMessage('Error creando cuenta', 'error');
-
-    showMessage('¡Cuenta creada! Ya puedes iniciar sesión', 'success');
-    setTimeout(() => { showForm('login-form'); clearForm('register-form'); setValue('login-username', username); }, 2000);
-}
-
-// GESTIÓN DE CLIENTES
-async function handleClientFormSubmit(e) {
-    e.preventDefault();
-    const nombre = value('nombre'), identificacion = value('identificacion'), telefono = value('telefono');
-    if (!nombre || !identificacion || !telefono) return alert('Complete todos los campos');
-
-    const existente = clientes.find(c => c.identificacion === identificacion);
-    if (existente) {
-        if (codigosUsados.includes(identificacion)) return alert('⚠️ Esta identificación ya fue usada');
-        if (!confirm('Cliente ya existe. ¿Regenerar QR?')) return;
+    const username = getValue('register-username');
+    const password = getValue('register-password');
+    const organizerCode = getValue('organizer-code');
+    
+    if (!username || !password || !organizerCode) {
+        showMessage('Completa todos los campos', 'error');
+        return;
     }
 
-    const nuevoCliente = { 
-        id: Date.now(), 
-        nombre, 
-        identificacion, 
-        telefono, 
-        fechaRegistro: new Date().toISOString()
+    if (password.length < 6) {
+        showMessage('La contraseña debe tener al menos 6 caracteres', 'error');
+        return;
+    }
+
+    if (organizerCode !== ORGANIZER_CODE) {
+        showMessage('Código de organizador incorrecto', 'error');
+        return;
+    }
+
+    showMessage('Creando cuenta...', 'info');
+
+    try {
+        // Verificar si usuario existe
+        const { data: existingUser, error: checkError } = await supabase
+            .from('nexus_usuarios')
+            .select('username')
+            .eq('username', username)
+            .single();
+
+        if (existingUser) {
+            showMessage('Este usuario ya existe', 'error');
+            return;
+        }
+
+        // Crear nuevo usuario
+        const passwordHash = hashPassword(password);
+        const { data, error } = await supabase
+            .from('nexus_usuarios')
+            .insert([{ 
+                username: username, 
+                password_hash: passwordHash 
+            }])
+            .select()
+            .single();
+
+        if (error) {
+            showMessage('Error creando la cuenta: ' + error.message, 'error');
+            return;
+        }
+
+        showMessage('¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.', 'success');
+        
+        // Volver al login
+        setTimeout(() => {
+            showForm('login-form');
+            clearForm('register-form');
+            setValue('login-username', username);
+            setValue('login-password', '');
+        }, 2000);
+
+    } catch (error) {
+        showMessage('Error de conexión con el servidor', 'error');
+        console.error('Register error:', error);
+    }
+}
+
+function handleLogout() {
+    usuarioActual = null;
+    sessionStorage.removeItem('nexus_usuario_actual');
+    showLogin();
+    showMessage('Sesión cerrada correctamente', 'success');
+}
+
+// ========== GESTIÓN DE CLIENTES ==========
+async function handleClientFormSubmit(e) {
+    e.preventDefault();
+    
+    const nombre = getValue('nombre');
+    const identificacion = getValue('identificacion');
+    const telefono = getValue('telefono');
+    
+    if (!nombre || !identificacion || !telefono) {
+        alert('Por favor complete todos los campos');
+        return;
+    }
+    
+    // Verificar si ya existe
+    const clienteExistente = clientes.find(cliente => cliente.identificacion === identificacion);
+    
+    if (clienteExistente) {
+        if (codigosUsados.includes(identificacion)) {
+            alert('⚠️ Este número de identificación YA FUE USADO para ingresar al evento y no puede reutilizarse.');
+            return;
+        }
+        
+        const confirmar = confirm('Este número de identificación ya está registrado. ¿Desea generar un nuevo QR?');
+        if (confirmar) {
+            generarQR(identificacion);
+            setText('qr-message', `QR para: ${clienteExistente.nombre} (Activo)`);
+            return;
+        }
+        return;
+    }
+    
+    // Crear nuevo cliente
+    const nuevoCliente = {
+        id: Date.now(),
+        nombre: nombre,
+        identificacion: identificacion,
+        telefono: telefono,
+        fechaRegistro: new Date().toISOString(),
+        usado: false
     };
     
     clientes.push(nuevoCliente);
     localStorage.setItem('clientes', JSON.stringify(clientes));
     
     generarQR(identificacion);
-    setText('qr-message', `QR para: ${nombre}`);
+    setText('qr-message', `QR generado para: ${nombre} (Activo)`);
+    
+    // Limpiar formulario
     e.target.reset();
-    await sincronizarDatos();
+    
+    // Sincronizar con Supabase
+    await sincronizarConSupabase();
 }
 
-function generarQR(id) {
-    const qrContainer = $('qrcode');
-    qrContainer.innerHTML = '';
+function generarQR(identificacion) {
+    const qrcodeElement = getElement('qrcode');
+    qrcodeElement.innerHTML = '';
     
     try {
-        const qr = qrcode(0, 'L');
-        qr.addData(id);
+        const typeNumber = 0;
+        const errorCorrectionLevel = 'L';
+        const qr = qrcode(typeNumber, errorCorrectionLevel);
+        qr.addData(identificacion);
         qr.make();
         
+        const qrSize = 250;
+        const cellSize = qrSize / qr.getModuleCount();
+        
         const canvas = document.createElement('canvas');
-        const size = 250;
-        const cellSize = size / qr.getModuleCount();
-        canvas.width = canvas.height = size;
+        canvas.width = qrSize;
+        canvas.height = qrSize;
+        canvas.style.border = '2px solid #8b5cf6';
+        canvas.style.borderRadius = '10px';
+        canvas.style.background = 'white';
+        canvas.style.padding = '10px';
+        canvas.style.display = 'block';
+        canvas.style.margin = '0 auto';
         
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, size, size);
-        ctx.fillStyle = '#000000';
         
+        // Fondo blanco
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, qrSize, qrSize);
+        
+        // Código QR negro
+        ctx.fillStyle = '#000000';
         for (let row = 0; row < qr.getModuleCount(); row++) {
             for (let col = 0; col < qr.getModuleCount(); col++) {
                 if (qr.isDark(row, col)) {
@@ -199,37 +232,49 @@ function generarQR(id) {
             }
         }
         
-        qrContainer.appendChild(canvas);
+        qrcodeElement.appendChild(canvas);
+        
     } catch (error) {
-        qrContainer.innerHTML = '<p style="color: #ef4444; text-align: center;">Error generando QR</p>';
+        console.error('Error generando QR:', error);
+        qrcodeElement.innerHTML = '<p style="color: #ef4444; font-weight: bold; text-align: center;">Error al generar QR</p>';
     }
 }
 
-// CÁMARA Y VERIFICACIÓN
+// ========== CÁMARA Y VERIFICACIÓN ==========
 async function startCamera() {
     try {
         stopCamera();
-        stream = await navigator.mediaDevices.getUserMedia({ 
+        
+        console.log('🎥 Iniciando cámara...');
+        const constraints = {
             video: { 
                 facingMode: "environment",
                 width: { ideal: 1280 },
                 height: { ideal: 720 }
             } 
+        };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        const video = getElement('video');
+        video.srcObject = stream;
+        showElement(video);
+        hideElement(getElement('camera-placeholder'));
+        hideElement(getElement('btn-start-camera'));
+        showElement(getElement('btn-stop-camera'));
+        
+        video.addEventListener('loadedmetadata', () => {
+            video.play().then(() => {
+                console.log('✅ Video listo, iniciando escaneo...');
+                startQRScanning();
+            });
         });
         
-        const video = $('video');
-        video.srcObject = stream;
-        show(video);
-        hide($('camera-placeholder'));
-        hide($('btn-start-camera'));
-        show($('btn-stop-camera'));
-        
-        video.onloadedmetadata = () => {
-            video.play();
-            startQRScanning();
-        };
     } catch (err) {
-        setHTML('camera-placeholder', `❌ Error: ${err.message}`);
+        console.error('Error al acceder a la cámara:', err);
+        const placeholder = getElement('camera-placeholder');
+        placeholder.innerHTML = '❌ Error: ' + err.message;
+        showElement(placeholder);
     }
 }
 
@@ -238,12 +283,13 @@ function stopCamera() {
         stream.getTracks().forEach(track => track.stop());
         stream = null;
     }
+    
     scanning = false;
     
-    hide($('video'));
-    show($('camera-placeholder'));
-    show($('btn-start-camera'));
-    hide($('btn-stop-camera'));
+    hideElement(getElement('video'));
+    showElement(getElement('camera-placeholder'));
+    showElement(getElement('btn-start-camera'));
+    hideElement(getElement('btn-stop-camera'));
 }
 
 function startQRScanning() {
@@ -254,72 +300,109 @@ function startQRScanning() {
 function scanQRCode() {
     if (!scanning || !stream) return;
     
-    const video = $('video'), canvas = $('canvas');
+    const video = getElement('video');
+    const canvas = getElement('canvas');
+    
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        // Configurar canvas
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         try {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
             const code = jsQR(imageData.data, imageData.width, imageData.height, {
                 inversionAttempts: "dontInvert",
             });
             
             if (code) {
+                console.log('✅ QR detectado:', code.data);
                 verificarCodigo(code.data);
                 stopCamera();
                 return;
             }
-        } catch (e) {}
-    }
-    
-    if (scanning) requestAnimationFrame(scanQRCode);
-}
-
-async function verificarCodigo(codigo) {
-    const result = $('verification-result');
-    
-    if (codigosUsados.includes(codigo)) {
-        result.className = 'result-card error';
-        setText('result-title', '❌ CÓDIGO YA USADO');
-        setText('result-message', 'Este código ya fue utilizado para ingresar');
-        setHTML('client-details', '<p>Acceso denegado - Código de un solo uso</p>');
-    } else {
-        const cliente = clientes.find(c => c.identificacion === codigo);
-        if (cliente) {
-            codigosUsados.push(codigo);
-            cliente.usado = true;
-            cliente.fechaUso = new Date().toISOString();
-            localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
-            localStorage.setItem('clientes', JSON.stringify(clientes));
-            
-            result.className = 'result-card success';
-            setText('result-title', '✅ ACCESO AUTORIZADO');
-            setText('result-message', 'Bienvenido/a al evento');
-            setHTML('client-details', `
-                <p><strong>Nombre:</strong> ${cliente.nombre}</p>
-                <p><strong>ID:</strong> ${cliente.identificacion}</p>
-                <p><strong>Teléfono:</strong> ${cliente.telefono}</p>
-                <p><strong>Hora de ingreso:</strong> ${new Date().toLocaleTimeString()}</p>
-                <p><em>⚠️ Este código ya no podrá ser reutilizado</em></p>
-            `);
-        } else {
-            result.className = 'result-card error';
-            setText('result-title', '❌ CÓDIGO INVÁLIDO');
-            setText('result-message', 'El código no está registrado');
-            setHTML('client-details', '');
+        } catch (error) {
+            // Silenciar errores de escaneo
         }
     }
     
-    show(result);
-    setValue('codigo-manual', '');
-    setTimeout(() => hide(result), 8000);
-    await sincronizarDatos();
+    if (scanning) {
+        requestAnimationFrame(scanQRCode);
+    }
 }
 
-// GESTIÓN
+async function verificarCodigo(codigo) {
+    const verificationResult = getElement('verification-result');
+    const resultTitle = getElement('result-title');
+    const resultMessage = getElement('result-message');
+    const clientDetails = getElement('client-details');
+    
+    if (codigosUsados.includes(codigo)) {
+        // Código ya usado
+        verificationResult.className = 'result-card error';
+        resultTitle.textContent = '❌ CÓDIGO YA USADO';
+        resultMessage.textContent = 'Este código QR ya fue utilizado para ingresar al evento.';
+        clientDetails.innerHTML = `
+            <p><strong>Acceso denegado:</strong> Código de un solo uso</p>
+            <p><strong>Medida de seguridad:</strong> Evita reutilización fraudulenta</p>
+        `;
+        showElement(verificationResult);
+        
+    } else {
+        const cliente = clientes.find(c => c.identificacion === codigo);
+        
+        if (cliente) {
+            // Código válido
+            codigosUsados.push(codigo);
+            localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
+            
+            cliente.usado = true;
+            cliente.fechaUso = new Date().toISOString();
+            localStorage.setItem('clientes', JSON.stringify(clientes));
+            
+            verificationResult.className = 'result-card success';
+            resultTitle.textContent = '✅ ACCESO AUTORIZADO';
+            resultMessage.textContent = 'Bienvenido/a al evento';
+            clientDetails.innerHTML = `
+                <p><strong>Nombre:</strong> ${cliente.nombre}</p>
+                <p><strong>Identificación:</strong> ${cliente.identificacion}</p>
+                <p><strong>Teléfono:</strong> ${cliente.telefono}</p>
+                <p><strong>Hora de ingreso:</strong> ${new Date().toLocaleTimeString()}</p>
+                <p><strong>⚠️ Este código ya no podrá ser reutilizado</strong></p>
+            `;
+            showElement(verificationResult);
+            
+        } else {
+            // Código inválido
+            verificationResult.className = 'result-card error';
+            resultTitle.textContent = '❌ CÓDIGO INVÁLIDO';
+            resultMessage.textContent = 'El código no está registrado en nuestra base de datos.';
+            clientDetails.innerHTML = '';
+            showElement(verificationResult);
+        }
+    }
+    
+    // Limpiar y ocultar después de 8 segundos
+    setValue('codigo-manual', '');
+    setTimeout(() => {
+        hideElement(verificationResult);
+    }, 8000);
+    
+    // Sincronizar cambios
+    await sincronizarConSupabase();
+}
+
+function handleManualVerification() {
+    const codigo = getValue('codigo-manual');
+    if (!codigo) {
+        alert('Por favor ingrese un código para verificar');
+        return;
+    }
+    verificarCodigo(codigo);
+}
+
+// ========== GESTIÓN Y ESTADÍSTICAS ==========
 function actualizarEstadisticas() {
     const total = clientes.length;
     const usados = codigosUsados.length;
@@ -331,67 +414,106 @@ function actualizarEstadisticas() {
 }
 
 function cargarListaClientes(filtro = '') {
-    const lista = $('lista-clientes');
+    const listaClientes = getElement('lista-clientes');
+    listaClientes.innerHTML = '';
+    
     let clientesFiltrados = clientes;
     
     if (filtro) {
-        const f = filtro.toLowerCase();
-        clientesFiltrados = clientes.filter(c => 
-            c.nombre.toLowerCase().includes(f) || c.identificacion.includes(f)
+        const filtroLower = filtro.toLowerCase();
+        clientesFiltrados = clientes.filter(cliente => 
+            cliente.nombre.toLowerCase().includes(filtroLower) ||
+            cliente.identificacion.includes(filtro)
         );
     }
     
     if (clientesFiltrados.length === 0) {
-        lista.innerHTML = '<div class="empty-state">No se encontraron clientes</div>';
+        listaClientes.innerHTML = '<div class="empty-state">No se encontraron clientes</div>';
         return;
     }
     
-    lista.innerHTML = clientesFiltrados.map(cliente => {
+    clientesFiltrados.forEach(cliente => {
         const usado = codigosUsados.includes(cliente.identificacion);
-        return `
-            <div class="client-item ${usado ? 'used' : ''}">
-                <div class="client-info">
-                    <h4>${cliente.nombre}</h4>
-                    <p><strong>ID:</strong> ${cliente.identificacion}</p>
-                    <p><strong>Teléfono:</strong> ${cliente.telefono}</p>
-                    <p><strong>Registro:</strong> ${new Date(cliente.fechaRegistro).toLocaleString()}</p>
-                    ${usado ? `<p><strong>Último ingreso:</strong> ${cliente.fechaUso ? new Date(cliente.fechaUso).toLocaleString() : 'No registrada'}</p>` : ''}
-                </div>
-                <div class="client-actions">
-                    <span class="status-badge ${usado ? 'used' : ''}">
-                        ${usado ? '✅ YA INGRESÓ' : '⏳ PENDIENTE'}
-                    </span>
-                    ${usado ? `<button onclick="autorizarReingresoCliente('${cliente.identificacion}')" class="btn warning small">Permitir Reingreso</button>` : ''}
-                </div>
+        const item = document.createElement('div');
+        item.className = `client-item ${usado ? 'used' : ''}`;
+        
+        item.innerHTML = `
+            <div class="client-info">
+                <h4>${cliente.nombre}</h4>
+                <p><strong>ID:</strong> ${cliente.identificacion}</p>
+                <p><strong>Teléfono:</strong> ${cliente.telefono}</p>
+                <p><strong>Registro:</strong> ${new Date(cliente.fechaRegistro).toLocaleString()}</p>
+                ${usado ? `<p><strong>Último ingreso:</strong> ${cliente.fechaUso ? new Date(cliente.fechaUso).toLocaleString() : 'Fecha no registrada'}</p>` : ''}
+            </div>
+            <div class="client-actions">
+                <span class="status-badge ${usado ? 'used' : ''}">
+                    ${usado ? '✅ YA INGRESÓ' : '⏳ PENDIENTE'}
+                </span>
+                ${usado ? `<button class="btn warning small" onclick="autorizarReingresoCliente('${cliente.identificacion}')">Permitir Reingreso</button>` : ''}
             </div>
         `;
-    }).join('');
+        
+        listaClientes.appendChild(item);
+    });
 }
 
-async function autorizarReingresoCliente(id) {
-    const cliente = clientes.find(c => c.identificacion === id);
-    if (!cliente) return alert('Cliente no encontrado');
-    if (!codigosUsados.includes(id)) return alert('Este cliente aún no ha ingresado');
+function buscarClientes() {
+    const filtro = getValue('buscar-cliente');
+    cargarListaClientes(filtro);
+}
 
-    if (confirm(`¿Autorizar reingreso para ${cliente.nombre}?`)) {
-        const index = codigosUsados.indexOf(id);
-        codigosUsados.splice(index, 1);
-        localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
-        
-        actualizarEstadisticas();
-        cargarListaClientes(value('buscar-cliente'));
-        await sincronizarDatos();
-        alert(`✅ Reingreso autorizado para ${cliente.nombre}`);
+async function autorizarReingresoCliente(identificacion) {
+    const cliente = clientes.find(c => c.identificacion === identificacion);
+    
+    if (!cliente) {
+        alert('Cliente no encontrado');
+        return;
+    }
+    
+    if (!codigosUsados.includes(identificacion)) {
+        alert('Este cliente aún no ha ingresado por primera vez');
+        return;
+    }
+    
+    const confirmar = confirm(`¿Autorizar reingreso para ${cliente.nombre} (${identificacion})?\n\nEl cliente podrá ingresar nuevamente al evento.`);
+    
+    if (confirmar) {
+        const index = codigosUsados.indexOf(identificacion);
+        if (index > -1) {
+            codigosUsados.splice(index, 1);
+            localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
+            
+            cliente.reingresoAutorizado = true;
+            cliente.fechaReingreso = new Date().toISOString();
+            localStorage.setItem('clientes', JSON.stringify(clientes));
+            
+            alert(`✅ Reingreso autorizado para ${cliente.nombre}\n\nAhora puede ingresar nuevamente al evento.`);
+            
+            actualizarEstadisticas();
+            cargarListaClientes(getValue('buscar-cliente'));
+            setValue('codigo-reingreso', '');
+
+            await sincronizarConSupabase();
+        }
     }
 }
 
-// SINCRONIZACIÓN SIMPLIFICADA
-async function sincronizarDatos() {
+function autorizarReingreso() {
+    const codigo = getValue('codigo-reingreso');
+    if (!codigo) {
+        alert('Por favor ingrese un código para autorizar reingreso');
+        return;
+    }
+    autorizarReingresoCliente(codigo);
+}
+
+// ========== SINCRONIZACIÓN SUPABASE ==========
+async function sincronizarConSupabase() {
     try {
-        showSyncStatus('syncing', 'Sincronizando...');
+        console.log('🔄 Sincronizando con Supabase...');
+        showSyncStatus('Sincronizando...', 'syncing');
         
-        // Siempre subir datos locales a Supabase
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('event_data')
             .upsert({
                 id: 'main',
@@ -400,41 +522,53 @@ async function sincronizarDatos() {
                 ultima_actualizacion: new Date().toISOString()
             }, {
                 onConflict: 'id'
-            });
+            })
+            .select();
 
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Error sincronizando:', error);
+            showSyncStatus('Error de sincronización', 'error');
+            throw error;
+        }
         
-        showSyncStatus('success', 'Sincronizado');
-        setTimeout(() => hide($('sync-status')), 3000);
+        console.log('✅ Sincronización exitosa');
+        showSyncStatus('Sincronizado', 'success');
+        
+        setTimeout(() => {
+            hideElement(getElement('sync-status'));
+        }, 3000);
+        
+        return data;
         
     } catch (error) {
-        console.error('Error sincronizando:', error);
-        showSyncStatus('error', 'Error de sincronización');
-        setTimeout(() => hide($('sync-status')), 5000);
+        console.error('💥 Error en sincronización:', error);
+        showSyncStatus('Error de conexión', 'error');
+        
+        setTimeout(() => {
+            hideElement(getElement('sync-status'));
+        }, 5000);
+        
+        throw error;
     }
 }
 
-async function sincronizacionForzada() {
+async function cargarDesdeSupabase() {
     try {
-        showSyncStatus('syncing', 'Sincronización forzada...');
+        console.log('📥 Cargando datos desde Supabase...');
         
-        // 1. Subir datos locales
-        await sincronizarDatos();
-        
-        // 2. Pequeña pausa
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // 3. Descargar datos de Supabase
         const { data, error } = await supabase
             .from('event_data')
             .select('*')
             .eq('id', 'main')
             .single();
 
-        if (error) throw error;
-        
+        if (error && error.code !== 'PGRST116') {
+            console.error('❌ Error cargando datos:', error);
+            return;
+        }
+
         if (data) {
-            // Reemplazar datos locales completamente
+            console.log('✅ Datos cargados desde Supabase');
             clientes = data.clientes || [];
             codigosUsados = data.codigos_usados || [];
             
@@ -443,52 +577,199 @@ async function sincronizacionForzada() {
             
             actualizarEstadisticas();
             cargarListaClientes();
-            
-            alert(`✅ Sincronización forzada completada\nClientes: ${clientes.length}\nCódigos: ${codigosUsados.length}`);
         }
+        
+    } catch (error) {
+        console.error('💥 Error cargando datos:', error);
+    }
+}
+
+async function sincronizacionForzada() {
+    try {
+        showSyncStatus('Sincronización forzada...', 'syncing');
+        
+        // Primero subir datos locales
+        await sincronizarConSupabase();
+        
+        // Pequeña pausa
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Luego descargar datos actualizados
+        await cargarDesdeSupabase();
+        
+        alert('✅ Sincronización forzada completada');
         
     } catch (error) {
         alert('❌ Error en sincronización forzada');
         console.error(error);
-    } finally {
-        hide($('sync-status'));
     }
 }
 
-function showSyncStatus(type, text) {
-    const status = $('sync-status');
+async function limpiarBaseDatos() {
+    const confirmacion = confirm(`⚠️ ¿ESTÁS ABSOLUTAMENTE SEGURO?\n\nEsta acción:\n• Eliminará TODOS los clientes (${clientes.length} registros)\n• Eliminará TODOS los códigos usados (${codigosUsados.length} códigos)\n• Se sincronizará con todos los dispositivos\n\n¿Continuar?`);
+    
+    if (!confirmacion) {
+        console.log('❌ Limpieza cancelada por el usuario');
+        return;
+    }
+    
+    try {
+        // Limpiar datos locales
+        clientes = [];
+        codigosUsados = [];
+        localStorage.removeItem('clientes');
+        localStorage.removeItem('codigosUsados');
+        
+        // Limpiar interfaz
+        const qrcodeElement = getElement('qrcode');
+        qrcodeElement.innerHTML = '';
+        setText('qr-message', 'El código QR aparecerá aquí después del registro');
+        
+        // Actualizar estadísticas y lista
+        actualizarEstadisticas();
+        cargarListaClientes();
+        
+        // Sincronizar con Supabase - ESTA ES LA PARTE CLAVE QUE FALTABA
+        await sincronizarConSupabase();
+        
+        alert(`✅ Base de datos limpiada completamente\n\nSe ha sincronizado con todos los dispositivos.`);
+        
+        console.log('✅ Base de datos limpiada exitosamente');
+        
+    } catch (error) {
+        console.error('❌ Error limpiando base de datos:', error);
+        alert('❌ Error al limpiar la base de datos. Revisa la consola para más detalles.');
+    }
+}
+
+function showSyncStatus(text, type) {
+    const status = getElement('sync-status');
     if (status) {
+        status.textContent = text;
         status.className = `sync-status ${type}`;
-        status.querySelector('.sync-text').textContent = text;
-        show(status);
+        showElement(status);
     }
 }
 
-// NAVEGACIÓN Y UI
+// ========== RECUPERACIÓN DE CONTRASEÑA ==========
+async function handlePasswordRecovery() {
+    const username = getValue('recover-username');
+    const organizerCode = getValue('recover-organizer-code');
+    const newPassword = getValue('new-password');
+    const confirmPassword = getValue('confirm-password');
+
+    if (!username || !organizerCode || !newPassword || !confirmPassword) {
+        showMessage('Por favor completa todos los campos', 'error');
+        return;
+    }
+
+    if (organizerCode !== ORGANIZER_CODE) {
+        showMessage('Código de organizador incorrecto', 'error');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showMessage('La nueva contraseña debe tener al menos 6 caracteres', 'error');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        showMessage('Las contraseñas no coinciden', 'error');
+        return;
+    }
+
+    try {
+        showMessage('Verificando usuario...', 'info');
+
+        // Buscar usuario en Supabase
+        const { data: user, error } = await supabase
+            .from('nexus_usuarios')
+            .select('*')
+            .eq('username', username)
+            .single();
+
+        if (error) {
+            showMessage('Usuario no encontrado', 'error');
+            return;
+        }
+
+        // Actualizar contraseña
+        const passwordHash = hashPassword(newPassword);
+        const { error: updateError } = await supabase
+            .from('nexus_usuarios')
+            .update({ password_hash: passwordHash })
+            .eq('username', username);
+
+        if (updateError) {
+            showMessage('Error al actualizar la contraseña', 'error');
+            return;
+        }
+
+        showMessage('✅ Contraseña restablecida exitosamente. Ahora puedes iniciar sesión.', 'success');
+        
+        // Volver al login
+        setTimeout(() => {
+            showForm('login-form');
+            setValue('login-username', username);
+            clearForm('recover-form');
+        }, 3000);
+
+    } catch (error) {
+        console.error('Error en recuperación:', error);
+        showMessage('Error de conexión con el servidor', 'error');
+    }
+}
+
+// ========== NAVEGACIÓN Y UI ==========
 function showScreen(screenId) {
+    // Ocultar todas las pantallas
     document.querySelectorAll('.screen').forEach(screen => {
-        screen.classList.toggle('active', screen.id === screenId);
+        screen.classList.remove('active');
     });
+    
+    // Mostrar la pantalla específica
+    const screen = document.getElementById(screenId);
+    if (screen) {
+        screen.classList.add('active');
+    }
 }
 
 function showForm(formId) {
-    ['login-form', 'register-form', 'recover-form'].forEach(id => {
-        const form = $(id);
-        if (form) form.style.display = id === formId ? 'block' : 'none';
+    // Ocultar todos los formularios
+    const forms = ['login-form', 'register-form', 'recover-form'];
+    forms.forEach(id => {
+        const form = document.getElementById(id);
+        if (form) form.style.display = 'none';
     });
+    
+    // Mostrar el formulario específico
+    const form = document.getElementById(formId);
+    if (form) {
+        form.style.display = 'block';
+    }
 }
 
 function showSection(sectionId) {
     // Actualizar navegación
     document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.section === sectionId);
+        btn.classList.remove('active');
     });
     
-    // Mostrar sección
-    ['ingresar-section', 'verificar-section', 'gestionar-section'].forEach(id => {
-        const section = $(id);
-        if (section) section.classList.toggle('active', id === sectionId);
+    const activeBtn = document.querySelector(`[data-section="${sectionId}"]`);
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+    }
+    
+    // Ocultar todas las secciones
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.remove('active');
     });
+    
+    // Mostrar sección específica
+    const section = document.getElementById(sectionId);
+    if (section) {
+        section.classList.add('active');
+    }
     
     // Detener cámara si no estamos en verificación
     if (sectionId !== 'verificar-section') {
@@ -522,65 +803,75 @@ function checkAuthStatus() {
 }
 
 function initMainApp() {
+    console.log('📱 Iniciando aplicación principal...');
     setupMainEventListeners();
+    
+    // Cargar datos de Supabase al iniciar
+    cargarDesdeSupabase();
     
     // Mostrar último QR si existe
     if (clientes.length > 0) {
-        const ultimo = clientes[clientes.length - 1];
-        if (!codigosUsados.includes(ultimo.identificacion)) {
-            generarQR(ultimo.identificacion);
-            setText('qr-message', `QR para: ${ultimo.nombre}`);
+        const ultimoCliente = clientes[clientes.length - 1];
+        if (!codigosUsados.includes(ultimoCliente.identificacion)) {
+            generarQR(ultimoCliente.identificacion);
+            setText('qr-message', `QR para: ${ultimoCliente.nombre} (Activo)`);
         }
     }
-    
-    // Sincronizar al iniciar
-    sincronizarDatos();
 }
 
-function showMessage(text, type) {
-    const msg = $('login-message');
-    if (msg) {
-        msg.textContent = text;
-        msg.className = `message ${type}`;
-        show(msg);
-        setTimeout(() => hide(msg), 5000);
-    }
+// ========== UTILIDADES ==========
+function getElement(id) {
+    return document.getElementById(id);
+}
+
+function getValue(id) {
+    const element = getElement(id);
+    return element ? element.value.trim() : '';
+}
+
+function setValue(id, value) {
+    const element = getElement(id);
+    if (element) element.value = value;
+}
+
+function setText(id, text) {
+    const element = getElement(id);
+    if (element) element.textContent = text;
+}
+
+function showElement(element) {
+    if (element) element.classList.remove('hidden');
+}
+
+function hideElement(element) {
+    if (element) element.classList.add('hidden');
 }
 
 function clearForm(formId) {
-    const form = $(formId);
+    const form = getElement(formId);
     if (form) form.reset();
 }
 
-// RECUPERACIÓN DE CONTRASEÑA
-async function handlePasswordRecovery() {
-    const username = value('recover-username'), code = value('recover-organizer-code');
-    const newPass = value('new-password'), confirmPass = value('confirm-password');
-    
-    if (!username || !code || !newPass || !confirmPass) return showMessage('Completa todos los campos', 'error');
-    if (newPass.length < 6) return showMessage('Contraseña muy corta', 'error');
-    if (code !== ORGANIZER_CODE) return showMessage('Código incorrecto', 'error');
-    if (newPass !== confirmPass) return showMessage('Contraseñas no coinciden', 'error');
-
-    showMessage('Verificando...', 'info');
-    const { data } = await supabase.from('nexus_usuarios').select('username').eq('username', username).single();
-    if (!data) return showMessage('Usuario no encontrado', 'error');
-
-    const { error } = await supabase.from('nexus_usuarios').update({ password_hash: hashPassword(newPass) }).eq('username', username);
-    if (error) return showMessage('Error actualizando contraseña', 'error');
-
-    showMessage('✅ Contraseña actualizada', 'success');
-    setTimeout(() => { 
-        showForm('login-form'); 
-        setValue('login-username', username); 
-        clearForm('recover-form'); 
-    }, 2000);
+function showMessage(text, type) {
+    const messageElement = getElement('login-message');
+    if (messageElement) {
+        messageElement.textContent = text;
+        messageElement.className = `message ${type}`;
+        showElement(messageElement);
+        
+        // Ocultar después de 5 segundos
+        setTimeout(() => {
+            hideElement(messageElement);
+        }, 5000);
+    }
 }
 
-// EVENT LISTENERS
+// ========== EVENT LISTENERS ==========
 function setupEventListeners() {
+    console.log('🔧 Configurando event listeners...');
+    
     // Auth listeners
-    const authHandlers = {
+    const authElements = {
         'btn-login': handleLogin,
         'btn-register': handleRegister,
         'btn-show-register': () => showForm('register-form'),
@@ -588,27 +879,29 @@ function setupEventListeners() {
         'btn-olvide-password': () => showForm('recover-form'),
         'btn-show-login-from-recover': () => showForm('login-form'),
         'btn-recover-password': handlePasswordRecovery,
-        'btn-logout': () => {
-            usuarioActual = null;
-            sessionStorage.removeItem('nexus_usuario_actual');
-            showLogin();
-        }
+        'btn-logout': handleLogout
     };
 
-    Object.entries(authHandlers).forEach(([id, handler]) => {
-        const element = $(id);
-        if (element) element.addEventListener('click', handler);
+    Object.entries(authElements).forEach(([id, handler]) => {
+        const element = getElement(id);
+        if (element) {
+            element.addEventListener('click', handler);
+        }
     });
 
     // Enter keys
-    ['login-password', 'organizer-code', 'confirm-password'].forEach(id => {
-        const element = $(id);
+    const enterHandlers = {
+        'login-password': handleLogin,
+        'organizer-code': handleRegister,
+        'confirm-password': handlePasswordRecovery
+    };
+
+    Object.entries(enterHandlers).forEach(([id, handler]) => {
+        const element = getElement(id);
         if (element) {
-            element.addEventListener('keypress', e => {
+            element.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    if (id === 'login-password') handleLogin();
-                    else if (id === 'organizer-code') handleRegister();
-                    else if (id === 'confirm-password') handlePasswordRecovery();
+                    handler();
                 }
             });
         }
@@ -616,42 +909,34 @@ function setupEventListeners() {
 }
 
 function setupMainEventListeners() {
+    console.log('🔧 Configurando event listeners principales...');
+    
     // Navegación
-    ['btn-ingresar', 'btn-verificar', 'btn-gestionar'].forEach(id => {
-        const element = $(id);
+    const navButtons = ['btn-ingresar', 'btn-verificar', 'btn-gestionar'];
+    navButtons.forEach(id => {
+        const element = getElement(id);
         if (element) {
-            element.addEventListener('click', () => showSection(element.dataset.section));
+            element.addEventListener('click', () => {
+                showSection(element.dataset.section);
+            });
         }
     });
 
     // Formularios y botones
     const mainHandlers = {
         'client-form': (el) => el.addEventListener('submit', handleClientFormSubmit),
-        'btn-verificar-manual': () => verificarCodigo(value('codigo-manual')),
+        'btn-verificar-manual': handleManualVerification,
         'btn-start-camera': startCamera,
         'btn-stop-camera': stopCamera,
-        'btn-buscar': () => cargarListaClientes(value('buscar-cliente')),
-        'btn-autorizar-reingreso': () => autorizarReingresoCliente(value('codigo-reingreso')),
-        'btn-forzar-sincronizacion': sincronizarDatos,
+        'btn-buscar': buscarClientes,
+        'btn-autorizar-reingreso': autorizarReingreso,
+        'btn-forzar-sincronizacion': sincronizarConSupabase,
         'btn-sincronizacion-forzada': sincronizacionForzada,
-        'btn-limpiar-db': () => {
-            if (confirm('¿ESTÁS SEGURO? Esto eliminará TODOS los clientes y códigos.')) {
-                clientes = [];
-                codigosUsados = [];
-                localStorage.removeItem('clientes');
-                localStorage.removeItem('codigosUsados');
-                $('qrcode').innerHTML = '';
-                setText('qr-message', 'El código QR aparecerá aquí después del registro');
-                actualizarEstadisticas();
-                cargarListaClientes();
-                sincronizarDatos();
-                alert('Base de datos limpiada');
-            }
-        }
+        'btn-limpiar-db': limpiarBaseDatos
     };
 
     Object.entries(mainHandlers).forEach(([id, handler]) => {
-        const element = $(id);
+        const element = getElement(id);
         if (element) {
             if (typeof handler === 'function') {
                 element.addEventListener('click', handler);
@@ -662,10 +947,33 @@ function setupMainEventListeners() {
     });
 
     // Búsqueda con Enter
-    const buscarInput = $('buscar-cliente');
+    const buscarInput = getElement('buscar-cliente');
     if (buscarInput) {
-        buscarInput.addEventListener('keypress', e => {
-            if (e.key === 'Enter') cargarListaClientes(value('buscar-cliente'));
+        buscarInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                buscarClientes();
+            }
         });
     }
+}
+
+// DEBUG FUNCTION - EJECUTAR EN CONSOLA
+function debugSupabase() {
+    console.log('🐛 DEBUG SUPABASE');
+    console.log('Usuario actual:', usuarioActual);
+    console.log('Clientes locales:', clientes.length);
+    console.log('Códigos locales:', codigosUsados.length);
+    
+    supabase.from('event_data').select('*').eq('id', 'main').single().then(({data, error}) => {
+        if (error) {
+            console.log('❌ Error Supabase:', error);
+        } else if (data) {
+            console.log('✅ Datos en Supabase:');
+            console.log('- Clientes:', data.clientes?.length || 0);
+            console.log('- Códigos:', data.codigos_usados?.length || 0);
+            console.log('- Última actualización:', data.ultima_actualizacion);
+        } else {
+            console.log('❌ No hay datos en Supabase');
+        }
+    });
 }
