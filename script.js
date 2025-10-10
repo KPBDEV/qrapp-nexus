@@ -7,30 +7,18 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ========== SISTEMA DE AUTENTICACIÓN NEXUS ==========
 const ORGANIZER_CODE = "NEXUS.082208";
-
-// Variables globales (se inicializarán después)
-let loginScreen, appContainer, loginForm, registerForm;
-let btnShowRegister, btnShowLogin, btnLogin, btnRegister, btnLogout;
-let userWelcome, loginMessage;
-
-// Usuario actual
 let usuarioActual = JSON.parse(sessionStorage.getItem('nexus_usuario_actual')) || null;
 
-// ========== FUNCIONES DE AUTENTICACIÓN CON SUPABASE ==========
-
-// Función para hashear contraseña
+// ========== FUNCIONES DE AUTENTICACIÓN ==========
 function hashPassword(password) {
     return btoa(unescape(encodeURIComponent(password)));
 }
 
-// Manejar login CON SUPABASE
 async function handleLogin() {
     console.log('🎯 handleLogin ejecutándose...');
     
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value.trim();
-
-    console.log('📝 Datos:', { username, password });
 
     if (!username || !password) {
         showAuthMessage('Por favor completa todos los campos', 'error');
@@ -40,17 +28,13 @@ async function handleLogin() {
     try {
         showAuthMessage('Verificando credenciales...', 'info');
         
-        // Buscar usuario en Supabase
         const { data, error } = await supabase
             .from('nexus_usuarios')
             .select('*')
             .eq('username', username)
             .single();
 
-        console.log('📡 Respuesta Supabase:', { data, error });
-
         if (error) {
-            console.log('❌ Error Supabase:', error);
             if (error.code === 'PGRST116') {
                 showAuthMessage('Usuario no encontrado', 'error');
             } else {
@@ -59,13 +43,7 @@ async function handleLogin() {
             return;
         }
 
-        // Verificar contraseña
         const passwordHash = hashPassword(password);
-        console.log('🔐 Verificando contraseña:', { 
-            inputHash: passwordHash, 
-            dbHash: data.password_hash 
-        });
-
         if (data.password_hash === passwordHash) {
             usuarioActual = {
                 id: data.id,
@@ -74,21 +52,18 @@ async function handleLogin() {
             };
             
             sessionStorage.setItem('nexus_usuario_actual', JSON.stringify(usuarioActual));
-            console.log('✅ Login exitoso:', usuarioActual);
             showApp();
             showAuthMessage('¡Bienvenido!', 'success');
         } else {
-            console.log('❌ Contraseña incorrecta');
             showAuthMessage('Contraseña incorrecta', 'error');
         }
 
     } catch (error) {
-        console.error('💥 Error en login:', error);
+        console.error('Error en login:', error);
         showAuthMessage('Error de conexión con el servidor', 'error');
     }
 }
 
-// Manejar registro CON SUPABASE
 async function handleRegister() {
     console.log('🎯 handleRegister ejecutándose...');
     
@@ -114,49 +89,32 @@ async function handleRegister() {
     try {
         showAuthMessage('Creando cuenta...', 'info');
 
-        // Verificar si el usuario ya existe en SUPABASE
         const { data: existingUsers, error: checkError } = await supabase
             .from('nexus_usuarios')
             .select('username')
             .eq('username', username);
 
-        if (checkError) {
-            console.log('Error en verificación:', checkError);
-        }
-
-        // Si encuentra algún usuario, existe
         if (existingUsers && existingUsers.length > 0) {
             showAuthMessage('Este usuario ya existe', 'error');
             return;
         }
 
-        // Crear nuevo usuario
         const passwordHash = hashPassword(password);
         const { data, error } = await supabase
             .from('nexus_usuarios')
-            .insert([
-                {
-                    username: username,
-                    password_hash: passwordHash
-                }
-            ])
+            .insert([{ username: username, password_hash: passwordHash }])
             .select();
 
         if (error) {
-            if (error.code === '23505') {
-                showAuthMessage('Este usuario ya existe', 'error');
-            } else {
-                showAuthMessage('Error creando la cuenta: ' + error.message, 'error');
-            }
+            showAuthMessage('Error creando la cuenta: ' + error.message, 'error');
             return;
         }
 
         showAuthMessage('¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.', 'success');
         
-        // Volver al login
         setTimeout(() => {
-            registerForm.style.display = 'none';
-            loginForm.style.display = 'block';
+            document.getElementById('register-form').style.display = 'none';
+            document.getElementById('login-form').style.display = 'block';
             document.getElementById('login-username').value = username;
             document.getElementById('login-password').value = '';
             document.getElementById('register-username').value = '';
@@ -170,7 +128,6 @@ async function handleRegister() {
     }
 }
 
-// Manejar logout
 function handleLogout() {
     usuarioActual = null;
     sessionStorage.removeItem('nexus_usuario_actual');
@@ -178,181 +135,62 @@ function handleLogout() {
     showAuthMessage('Sesión cerrada correctamente', 'success');
 }
 
-// Mostrar mensajes de auth
 function showAuthMessage(text, type) {
-    loginMessage.textContent = text;
-    loginMessage.style.display = 'block';
-    loginMessage.style.color = type === 'error' ? '#ef4444' : 
-                              type === 'success' ? '#10b981' : '#6366f1';
-    loginMessage.style.fontWeight = '600';
-}
-
-// ========== INICIALIZACIÓN DE LA APLICACIÓN ==========
-function initApp() {
-    console.log('🚀 Inicializando aplicación NEXUS...');
-    
-    // Esperar a que el DOM esté completamente listo
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
-        });
-    } else {
-        initializeApp();
+    const loginMessage = document.getElementById('login-message');
+    if (loginMessage) {
+        loginMessage.textContent = text;
+        loginMessage.style.display = 'block';
+        loginMessage.style.color = type === 'error' ? '#ef4444' : 
+                                  type === 'success' ? '#10b981' : '#6366f1';
     }
 }
 
-function initializeApp() {
-    console.log('🔍 Inicializando elementos DOM...');
-    
-    // Inicializar elementos DOM
-    initializeDOMElements();
-    
-    // Verificar que todos los elementos críticos existen
-    if (!btnLogin || !btnShowRegister || !loginForm) {
-        console.error('❌ Elementos críticos no encontrados:', {
-            btnLogin: !!btnLogin,
-            btnShowRegister: !!btnShowRegister,
-            loginForm: !!loginForm
-        });
-        
-        // Reintentar después de un breve delay
-        setTimeout(initializeApp, 100);
-        return;
-    }
-    
-    // Configurar event listeners
-    setupAuthEventListeners();
-    
-    // Verificar estado de autenticación
-    checkAuthStatus();
-    
-    console.log('✅ Aplicación inicializada correctamente');
-}
-
-// Inicializar elementos DOM
-function initializeDOMElements() {
-    console.log('🔍 Buscando elementos DOM...');
-    
-    loginScreen = document.getElementById('login-screen');
-    appContainer = document.getElementById('app-container');
-    loginForm = document.getElementById('login-form');
-    registerForm = document.getElementById('register-form');
-    btnShowRegister = document.getElementById('btn-show-register');
-    btnShowLogin = document.getElementById('btn-show-login');
-    btnLogin = document.getElementById('btn-login');
-    btnRegister = document.getElementById('btn-register');
-    btnLogout = document.getElementById('btn-logout');
-    userWelcome = document.getElementById('user-welcome');
-    loginMessage = document.getElementById('login-message');
-    
-    console.log('📋 Estado de elementos:', {
-        loginScreen: !!loginScreen,
-        appContainer: !!appContainer, 
-        loginForm: !!loginForm,
-        registerForm: !!registerForm,
-        btnShowRegister: !!btnShowRegister,
-        btnShowLogin: !!btnShowLogin,
-        btnLogin: !!btnLogin,
-        btnRegister: !!btnRegister,
-        btnLogout: !!btnLogout,
-        userWelcome: !!userWelcome,
-        loginMessage: !!loginMessage
-    });
-    
-    // Si faltan elementos críticos, mostrar error específico
-    if (!btnLogin) console.error('❌ ERROR: btnLogin no encontrado');
-    if (!btnShowRegister) console.error('❌ ERROR: btnShowRegister no encontrado');
-    if (!loginForm) console.error('❌ ERROR: loginForm no encontrado');
-}
-
-// Configurar event listeners de auth
+// ========== CONFIGURACIÓN DE EVENT LISTENERS ==========
 function setupAuthEventListeners() {
     console.log('🔧 Configurando event listeners...');
     
-    // Verificar que los elementos existen antes de agregar listeners
-    if (!btnLogin || !btnShowRegister || !loginForm) {
-        console.error('❌ No se pueden configurar event listeners - elementos faltantes');
+    const btnShowRegister = document.getElementById('btn-show-register');
+    const btnShowLogin = document.getElementById('btn-show-login');
+    const btnLogin = document.getElementById('btn-login');
+    const btnRegister = document.getElementById('btn-register');
+    const btnLogout = document.getElementById('btn-logout');
+    
+    if (!btnLogin || !btnShowRegister) {
+        console.error('❌ Elementos críticos no encontrados');
         return;
     }
     
-    // Prevenir envío de formularios
-    if (loginForm) {
-        loginForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            console.log('📝 Formulario login prevenido');
-        });
-    }
-    
-    if (registerForm) {
-        registerForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            console.log('📝 Formulario registro prevenido');
-        });
-    }
-    
-    // Configurar botones con verificaciones
-    if (btnShowRegister) {
-        btnShowRegister.addEventListener('click', () => {
-            console.log('🔄 Mostrar registro');
-            if (loginForm) loginForm.style.display = 'none';
-            if (registerForm) registerForm.style.display = 'block';
-            if (loginMessage) loginMessage.style.display = 'none';
-        });
-    }
+    btnShowRegister.addEventListener('click', () => {
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('register-form').style.display = 'block';
+        document.getElementById('login-message').style.display = 'none';
+    });
 
-    if (btnShowLogin) {
-        btnShowLogin.addEventListener('click', () => {
-            console.log('🔄 Mostrar login');
-            if (registerForm) registerForm.style.display = 'none';
-            if (loginForm) loginForm.style.display = 'block';
-            if (loginMessage) loginMessage.style.display = 'none';
-        });
-    }
+    btnShowLogin.addEventListener('click', () => {
+        document.getElementById('register-form').style.display = 'none';
+        document.getElementById('login-form').style.display = 'block';
+        document.getElementById('login-message').style.display = 'none';
+    });
 
-    if (btnLogin) {
-        btnLogin.addEventListener('click', function() {
-            console.log('🎯 Botón login clickeado!');
-            handleLogin();
-        });
-    }
-    
-    if (btnRegister) {
-        btnRegister.addEventListener('click', function() {
-            console.log('🎯 Botón registro clickeado!');
-            handleRegister();
-        });
-    }
+    btnLogin.addEventListener('click', handleLogin);
+    btnRegister.addEventListener('click', handleRegister);
     
     if (btnLogout) {
         btnLogout.addEventListener('click', handleLogout);
     }
 
-    // Enter key en formularios
-    const loginPassword = document.getElementById('login-password');
-    const organizerCode = document.getElementById('organizer-code');
+    document.getElementById('login-password').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
     
-    if (loginPassword) {
-        loginPassword.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                console.log('↵ Enter en password');
-                handleLogin();
-            }
-        });
-    }
-    
-    if (organizerCode) {
-        organizerCode.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                console.log('↵ Enter en organizer-code');
-                handleRegister();
-            }
-        });
-    }
+    document.getElementById('organizer-code').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleRegister();
+    });
 
-    console.log('✅ Event listeners configurados correctamente');
+    console.log('✅ Event listeners configurados');
 }
 
-// Verificar estado de autenticación
+// ========== GESTIÓN DE INTERFAZ ==========
 function checkAuthStatus() {
     if (usuarioActual) {
         showApp();
@@ -361,30 +199,34 @@ function checkAuthStatus() {
     }
 }
 
-// Mostrar login
 function showLogin() {
-    console.log('👤 Mostrando pantalla de login');
+    const loginScreen = document.getElementById('login-screen');
+    const appContainer = document.getElementById('app-container');
     if (loginScreen) loginScreen.style.display = 'flex';
     if (appContainer) appContainer.style.display = 'none';
-    if (loginForm) loginForm.style.display = 'block';
-    if (registerForm) registerForm.style.display = 'none';
-    if (loginMessage) loginMessage.style.display = 'none';
 }
 
-// Mostrar aplicación
 function showApp() {
-    console.log('📱 Mostrando aplicación principal');
+    const loginScreen = document.getElementById('login-screen');
+    const appContainer = document.getElementById('app-container');
+    const userWelcome = document.getElementById('user-welcome');
+    
     if (loginScreen) loginScreen.style.display = 'none';
     if (appContainer) appContainer.style.display = 'block';
     if (userWelcome && usuarioActual) userWelcome.textContent = `Bienvenido, ${usuarioActual.username}`;
     
-    // Iniciar la app original
     initMainApp();
 }
 
-// ========== VARIABLES DE LA APP PRINCIPAL ==========
+// ========== INICIALIZACIÓN PRINCIPAL ==========
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Inicializando NEXUS...');
+    setupAuthEventListeners();
+    checkAuthStatus();
+    console.log('✅ NEXUS listo');
+});
 
-// Base de datos local como fallback
+// ========== APLICACIÓN PRINCIPAL NEXUS (CÓDIGO ORIGINAL) ==========
 let clientes = JSON.parse(localStorage.getItem('clientes')) || [];
 let codigosUsados = JSON.parse(localStorage.getItem('codigosUsados')) || [];
 
@@ -422,189 +264,11 @@ const btnAutorizarReingreso = document.getElementById('btn-autorizar-reingreso')
 let stream = null;
 let scanning = false;
 let animationFrame = null;
-
-// ========== SISTEMA DE SINCRONIZACIÓN CON SUPABASE ==========
 let sincronizacionActiva = false;
 
-// ========== INICIALIZACIÓN DE LA APLICACIÓN ==========
-function initApp() {
-    setupAuthEventListeners();
-    checkAuthStatus();
-}
-
-// Verificar estado de autenticación
-function checkAuthStatus() {
-    if (usuarioActual) {
-        showApp();
-    } else {
-        showLogin();
-    }
-}
-
-// Mostrar login
-function showLogin() {
-    loginScreen.style.display = 'flex';
-    appContainer.style.display = 'none';
-    loginForm.style.display = 'block';
-    registerForm.style.display = 'none';
-    loginMessage.style.display = 'none';
-}
-
-// Mostrar aplicación
-function showApp() {
-    loginScreen.style.display = 'none';
-    appContainer.style.display = 'block';
-    userWelcome.textContent = `Bienvenido, ${usuarioActual.username}`;
-    
-    // Iniciar la app original
-    initMainApp();
-}
-
-// Configurar event listeners de auth
-function setupAuthEventListeners() {
-    btnShowRegister.addEventListener('click', () => {
-        loginForm.style.display = 'none';
-        registerForm.style.display = 'block';
-        loginMessage.style.display = 'none';
-    });
-
-    btnShowLogin.addEventListener('click', () => {
-        registerForm.style.display = 'none';
-        loginForm.style.display = 'block';
-        loginMessage.style.display = 'none';
-    });
-
-    btnLogin.addEventListener('click', handleLogin);
-    btnRegister.addEventListener('click', handleRegister);
-    btnLogout.addEventListener('click', handleLogout);
-
-    // Enter key en formularios
-    document.getElementById('login-password').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleLogin();
-    });
-    
-    document.getElementById('organizer-code').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') handleRegister();
-    });
-}
-
-// Manejar login
-function handleLogin() {
-    const username = document.getElementById('login-username').value.trim();
-    const password = document.getElementById('login-password').value.trim();
-
-    if (!username || !password) {
-        showAuthMessage('Por favor completa todos los campos', 'error');
-        return;
-    }
-}
-
-// Manejar registro CON SUPABASE
-// Manejar registro CON SUPABASE (VERSIÓN CORREGIDA)
-async function handleRegister() {
-    const username = document.getElementById('register-username').value.trim();
-    const password = document.getElementById('register-password').value.trim();
-    const organizerCode = document.getElementById('organizer-code').value.trim();
-
-    if (!username || !password || !organizerCode) {
-        showAuthMessage('Por favor completa todos los campos', 'error');
-        return;
-    }
-
-    if (password.length < 6) {
-        showAuthMessage('La contraseña debe tener al menos 6 caracteres', 'error');
-        return;
-    }
-
-    if (organizerCode !== ORGANIZER_CODE) {
-        showAuthMessage('Código de organizador incorrecto', 'error');
-        return;
-    }
-
-    try {
-        showAuthMessage('Creando cuenta...', 'info');
-
-        // VERIFICAR SI EL USUARIO YA EXISTE EN SUPABASE (CORREGIDO)
-        const { data: existingUsers, error: checkError } = await supabase
-            .from('nexus_usuarios')
-            .select('username')
-            .eq('username', username);
-
-        if (checkError) {
-            console.log('Error en verificación (puede ignorarse):', checkError);
-            // Continuamos aunque haya error en la verificación
-        }
-
-        // Si encuentra algún usuario, existe
-        if (existingUsers && existingUsers.length > 0) {
-            showAuthMessage('Este usuario ya existe', 'error');
-            return;
-        }
-
-        // Crear nuevo usuario
-        const passwordHash = hashPassword(password);
-        const { data, error } = await supabase
-            .from('nexus_usuarios')
-            .insert([
-                {
-                    username: username,
-                    password_hash: passwordHash
-                }
-            ])
-            .select();
-
-        if (error) {
-            if (error.code === '23505') { // Unique violation
-                showAuthMessage('Este usuario ya existe', 'error');
-            } else {
-                showAuthMessage('Error creando la cuenta: ' + error.message, 'error');
-            }
-            return;
-        }
-
-        showAuthMessage('¡Cuenta creada exitosamente! Ahora puedes iniciar sesión.', 'success');
-        
-        // Volver al login
-        setTimeout(() => {
-            registerForm.style.display = 'none';
-            loginForm.style.display = 'block';
-            document.getElementById('login-username').value = username;
-            document.getElementById('login-password').value = '';
-            document.getElementById('register-username').value = '';
-            document.getElementById('register-password').value = '';
-            document.getElementById('organizer-code').value = '';
-        }, 2000);
-
-    } catch (error) {
-        console.error('Error en registro:', error);
-        showAuthMessage('Error de conexión con el servidor', 'error');
-    }
-}
-
-// Manejar logout
-function handleLogout() {
-    usuarioActual = null;
-    localStorage.removeItem('nexus_usuario_actual');
-    showLogin();
-    showAuthMessage('Sesión cerrada correctamente', 'success');
-}
-
-// Mostrar mensajes de auth
-function showAuthMessage(text, type) {
-    loginMessage.textContent = text;
-    loginMessage.style.display = 'block';
-    loginMessage.style.color = type === 'error' ? '#ef4444' : '#10b981';
-    loginMessage.style.fontWeight = '600';
-}
-
-// ========== APLICACIÓN PRINCIPAL NEXUS ==========
 function initMainApp() {
     console.log('Iniciando aplicación NEXUS...');
-    console.log('Clientes registrados:', clientes.length);
-    console.log('Códigos ya usados:', codigosUsados.length);
-    
     setupMainEventListeners();
-    iniciarSincronizacionAutomatica();
     
     if (clientes.length > 0) {
         const ultimoCliente = clientes[clientes.length - 1];
@@ -618,7 +282,6 @@ function initMainApp() {
     }
 }
 
-// Configurar event listeners principales
 function setupMainEventListeners() {
     btnIngresar.addEventListener('click', showIngresarSection);
     btnVerificar.addEventListener('click', showVerificarSection);
@@ -631,22 +294,10 @@ function setupMainEventListeners() {
     btnAutorizarReingreso.addEventListener('click', autorizarReingreso);
 
     buscarCliente.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            buscarClientes();
-        }
+        if (e.key === 'Enter') buscarClientes();
     });
-
-    // Agregar botón de limpieza para testing
-    const limpiarBtn = document.createElement('button');
-    limpiarBtn.textContent = '🗑️ Limpiar BD (Testing)';
-    limpiarBtn.className = 'nexus-btn';
-    limpiarBtn.style.background = '#ef4444';
-    limpiarBtn.style.marginTop = '10px';
-    limpiarBtn.onclick = limpiarBaseDatos;
-    document.querySelector('.button-container').appendChild(limpiarBtn);
 }
 
-// ========== NAVEGACIÓN ENTRE SECCIONES ==========
 function showIngresarSection() {
     ingresarSection.classList.add('active');
     verificarSection.classList.remove('active');
@@ -665,12 +316,10 @@ function showGestionarSection() {
     ingresarSection.classList.remove('active');
     verificarSection.classList.remove('active');
     stopCamera();
-    
     actualizarEstadisticas();
     cargarListaClientes();
 }
 
-// ========== GESTIÓN DE CLIENTES Y QR ==========
 async function handleClientFormSubmit(e) {
     e.preventDefault();
     
@@ -717,10 +366,6 @@ async function handleClientFormSubmit(e) {
     qrMessage.style.color = '';
     
     clientForm.reset();
-    
-    console.log('Cliente registrado:', nuevoCliente);
-    
-    // Subir a Supabase después de guardar localmente
     await subirCambiosASupabase();
 }
 
@@ -748,11 +393,10 @@ function generarQR(identificacion) {
         canvas.style.margin = '0 auto';
         
         const ctx = canvas.getContext('2d');
-        
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, qrSize, qrSize);
-        
         ctx.fillStyle = '#000000';
+        
         for (let row = 0; row < qr.getModuleCount(); row++) {
             for (let col = 0; col < qr.getModuleCount(); col++) {
                 if (qr.isDark(row, col)) {
@@ -769,45 +413,26 @@ function generarQR(identificacion) {
     }
 }
 
-// ========== SISTEMA DE CÁMARA Y VERIFICACIÓN ==========
 async function startCamera() {
     try {
         stopCamera();
         
         console.log('🎥 Iniciando cámara...');
-        
-        const constraints = {
-            video: { 
-                facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                frameRate: { ideal: 24 }
-            } 
-        };
-
+        const constraints = { video: { facingMode: "environment" } };
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         
-        // CONFIGURAR VIDEO PRINCIPAL
         video.srcObject = stream;
         video.style.display = 'block';
-        video.style.width = '100%';
-        video.style.height = '100%';
-        video.style.objectFit = 'cover';
-        
-        // OCULTAR ELEMENTOS QUE CAUSAN DUPLICACIÓN
         cameraPlaceholder.style.display = 'none';
         canvas.style.display = 'none';
         
         btnStartCamera.style.display = 'none';
         btnStopCamera.style.display = 'inline-block';
-        
-        // AGREGAR OVERLAY CON TRANSPARENCIA
         agregarOverlayConTransparencia();
         
         video.addEventListener('loadedmetadata', () => {
             video.play().then(() => {
                 console.log('✅ Video listo, iniciando escaneo...');
-                // Configurar canvas EN MEMORIA (no visible)
                 canvas.width = 320;
                 canvas.height = 240;
                 startQRScanning();
@@ -821,12 +446,9 @@ async function startCamera() {
     }
 }
 
-// Overlay con transparencia
 function agregarOverlayConTransparencia() {
     const existingOverlay = document.getElementById('scan-overlay');
-    if (existingOverlay) {
-        existingOverlay.remove();
-    }
+    if (existingOverlay) existingOverlay.remove();
     
     const overlay = document.createElement('div');
     overlay.id = 'scan-overlay';
@@ -836,21 +458,15 @@ function agregarOverlayConTransparencia() {
         <div class="scan-line"></div>
         <div class="scan-text">Enfoca el código QR en el marco</div>
     `;
-    
-    const scanner = document.getElementById('scanner');
-    scanner.appendChild(overlay);
+    document.getElementById('scanner').appendChild(overlay);
 }
 
-// Escanear código QR
 function scanQRCode() {
     if (!scanning || !stream) return;
     
     if (video.readyState === video.HAVE_ENOUGH_DATA) {
         const context = canvas.getContext('2d', { willReadFrequently: true });
-        
-        // DIBUJAR FRAME REDUCIDO (más rápido)
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
         
         try {
@@ -859,36 +475,27 @@ function scanQRCode() {
             });
             
             if (code) {
-                console.log('✅ QR detectado instantáneamente:', code.data);
+                console.log('✅ QR detectado:', code.data);
                 verificarCodigo(code.data);
                 stopCamera();
-                // Mostrar feedback visual
                 mostrarFeedbackQRDetectado();
                 return;
             }
-        } catch (error) {
-            // Silenciar errores de escaneo
-        }
+        } catch (error) {}
     }
     
     if (scanning) {
-        // ESCANEAR CADA 150ms (no continuo) - MENOS LAG
         animationFrame = setTimeout(() => {
             requestAnimationFrame(scanQRCode);
         }, 150);
     }
 }
 
-// Feedback visual cuando detecta QR
 function mostrarFeedbackQRDetectado() {
     const overlay = document.getElementById('scan-overlay');
     if (overlay) {
-        overlay.innerHTML = `
-            <div class="scan-success">✅ QR DETECTADO</div>
-        `;
-        setTimeout(() => {
-            if (overlay) overlay.remove();
-        }, 2000);
+        overlay.innerHTML = `<div class="scan-success">✅ QR DETECTADO</div>`;
+        setTimeout(() => { if (overlay) overlay.remove(); }, 2000);
     }
 }
 
@@ -910,11 +517,8 @@ function stopCamera() {
     btnStopCamera.style.display = 'none';
     scanning = false;
     
-    // Remover overlay
     const overlay = document.getElementById('scan-overlay');
-    if (overlay) {
-        overlay.remove();
-    }
+    if (overlay) overlay.remove();
 }
 
 function startQRScanning() {
@@ -922,19 +526,15 @@ function startQRScanning() {
     scanQRCode();
 }
 
-// Verificar código manualmente
 function handleManualVerification() {
     const codigo = codigoManual.value.trim();
-    
     if (!codigo) {
         alert('Por favor ingrese un código para verificar');
         return;
     }
-    
     verificarCodigo(codigo);
 }
 
-// Función para verificar código
 async function verificarCodigo(codigo) {
     if (codigosUsados.includes(codigo)) {
         verificationResult.className = 'verification-result error';
@@ -945,21 +545,15 @@ async function verificarCodigo(codigo) {
             <p><strong>Medida de seguridad:</strong> Evita reutilización fraudulenta</p>
         `;
         verificationResult.style.display = 'block';
-        
         codigoManual.value = '';
-        
-        setTimeout(() => {
-            verificationResult.style.display = 'none';
-        }, 8000);
+        setTimeout(() => { verificationResult.style.display = 'none'; }, 8000);
         return;
     }
     
     const cliente = clientes.find(c => c.identificacion === codigo);
-    
     if (cliente) {
         codigosUsados.push(codigo);
         localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
-        
         cliente.usado = true;
         cliente.fechaUso = new Date().toISOString();
         localStorage.setItem('clientes', JSON.stringify(clientes));
@@ -975,9 +569,7 @@ async function verificarCodigo(codigo) {
             <p><strong>⚠️ Este código ya no podrá ser reutilizado</strong></p>
         `;
         verificationResult.style.display = 'block';
-        
         playBeepSound();
-        
     } else {
         verificationResult.className = 'verification-result error';
         resultTitle.textContent = '❌ CÓDIGO INVÁLIDO';
@@ -987,31 +579,21 @@ async function verificarCodigo(codigo) {
     }
     
     codigoManual.value = '';
-    
-    setTimeout(() => {
-        verificationResult.style.display = 'none';
-    }, 8000);
-    
-    // Subir a Supabase después de verificar
+    setTimeout(() => { verificationResult.style.display = 'none'; }, 8000);
     await subirCambiosASupabase();
 }
 
-// Sonido de confirmación
 function playBeepSound() {
     try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
-        
         oscillator.connect(gainNode);
         gainNode.connect(audioContext.destination);
-        
         oscillator.frequency.value = 800;
         oscillator.type = 'sine';
-        
         gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-        
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.5);
     } catch (error) {
@@ -1019,12 +601,10 @@ function playBeepSound() {
     }
 }
 
-// ========== GESTIÓN Y ESTADÍSTICAS ==========
 function actualizarEstadisticas() {
     const total = clientes.length;
     const usados = codigosUsados.length;
     const pendientes = total - usados;
-    
     totalRegistrados.textContent = total;
     totalIngresaron.textContent = usados;
     totalPendientes.textContent = pendientes;
@@ -1032,7 +612,6 @@ function actualizarEstadisticas() {
 
 function cargarListaClientes(filtro = '') {
     listaClientes.innerHTML = '';
-    
     let clientesFiltrados = clientes;
     
     if (filtro) {
@@ -1052,7 +631,6 @@ function cargarListaClientes(filtro = '') {
         const usado = codigosUsados.includes(cliente.identificacion);
         const item = document.createElement('div');
         item.className = `nexus-client-item ${usado ? 'usado' : ''}`;
-        
         item.innerHTML = `
             <div class="cliente-info">
                 <h4>${cliente.nombre}</h4>
@@ -1068,7 +646,6 @@ function cargarListaClientes(filtro = '') {
                 ${usado ? `<button class="btn-reingresar" onclick="autorizarReingresoCliente('${cliente.identificacion}')">Permitir Reingreso</button>` : ''}
             </div>
         `;
-        
         listaClientes.appendChild(item);
     });
 }
@@ -1078,70 +655,52 @@ function buscarClientes() {
     cargarListaClientes(filtro);
 }
 
-// Autorizar reingreso desde input
 function autorizarReingreso() {
     const codigo = codigoReingreso.value.trim();
-    
     if (!codigo) {
         alert('Por favor ingrese un código para autorizar reingreso');
         return;
     }
-    
     autorizarReingresoCliente(codigo);
 }
 
-// Autorizar reingreso de un cliente específico
 async function autorizarReingresoCliente(identificacion) {
     const cliente = clientes.find(c => c.identificacion === identificacion);
-    
     if (!cliente) {
         alert('Cliente no encontrado');
         return;
     }
-    
     if (!codigosUsados.includes(identificacion)) {
         alert('Este cliente aún no ha ingresado por primera vez');
         return;
     }
-    
     const confirmar = confirm(`¿Autorizar reingreso para ${cliente.nombre} (${identificacion})?`);
-    
     if (confirmar) {
         const index = codigosUsados.indexOf(identificacion);
         if (index > -1) {
             codigosUsados.splice(index, 1);
             localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
-            
             cliente.reingresoAutorizado = true;
             cliente.fechaReingreso = new Date().toISOString();
             localStorage.setItem('clientes', JSON.stringify(clientes));
-            
             alert(`✅ Reingreso autorizado para ${cliente.nombre}\nAhora puede ingresar nuevamente al evento`);
-            
             actualizarEstadisticas();
             cargarListaClientes(buscarCliente.value);
             codigoReingreso.value = '';
-
-            // Subir a Supabase después de autorizar reingreso
             await subirCambiosASupabase();
         }
     }
 }
 
-// ========== SINCRONIZACIÓN SUPABASE ==========
-// Iniciar sincronización automática
 async function iniciarSincronizacionAutomatica() {
     if (sincronizacionActiva || !usuarioActual) return;
-    
     sincronizacionActiva = true;
     console.log('🔄 Sincronización Supabase iniciada');
-    
     crearElementoEstado();
     await cargarDatosIniciales();
     escucharCambiosEnTiempoReal();
 }
 
-// Cargar datos iniciales desde Supabase
 async function cargarDatosIniciales() {
     try {
         const { data, error } = await supabase
@@ -1159,13 +718,10 @@ async function cargarDatosIniciales() {
             console.log('📥 Datos cargados desde Supabase');
             clientes = data.clientes || [];
             codigosUsados = data.codigos_usados || [];
-            
             localStorage.setItem('clientes', JSON.stringify(clientes));
             localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
-            
             actualizarInterfaz();
         } else {
-            // Crear documento inicial si no existe
             await crearDocumentoInicial();
         }
     } catch (error) {
@@ -1173,54 +729,33 @@ async function cargarDatosIniciales() {
     }
 }
 
-// Escuchar cambios en tiempo real
 function escucharCambiosEnTiempoReal() {
     const subscription = supabase
         .channel('event-changes')
-        .on('postgres_changes', 
-            { 
-                event: '*', 
-                schema: 'public', 
-                table: 'event_data',
-                filter: 'id=eq.main'
-            }, 
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'event_data', filter: 'id=eq.main' }, 
             async (payload) => {
                 console.log('🔄 Cambio en tiempo real detectado');
                 actualizarEstadoSincronizacion('sincronizando');
-                
                 if (payload.new) {
                     clientes = payload.new.clientes || [];
                     codigosUsados = payload.new.codigos_usados || [];
-                    
                     localStorage.setItem('clientes', JSON.stringify(clientes));
                     localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
-                    
                     actualizarInterfaz();
                     console.log('✅ Base de datos actualizada desde Supabase');
                 }
-                
                 actualizarEstadoSincronizacion('sincronizado');
             }
         )
         .subscribe();
-
     return subscription;
 }
 
-// Crear documento inicial
 async function crearDocumentoInicial() {
     try {
         const { error } = await supabase
             .from('event_data')
-            .insert([
-                {
-                    id: 'main',
-                    clientes: clientes,
-                    codigos_usados: codigosUsados,
-                    ultima_actualizacion: new Date().toISOString()
-                }
-            ]);
-
+            .insert([{ id: 'main', clientes: clientes, codigos_usados: codigosUsados, ultima_actualizacion: new Date().toISOString() }]);
         if (error) throw error;
         console.log('📝 Documento inicial creado en Supabase');
     } catch (error) {
@@ -1228,18 +763,12 @@ async function crearDocumentoInicial() {
     }
 }
 
-// Subir cambios locales a Supabase
 async function subirCambiosASupabase() {
     try {
         const { error } = await supabase
             .from('event_data')
-            .update({
-                clientes: clientes,
-                codigos_usados: codigosUsados,
-                ultima_actualizacion: new Date().toISOString()
-            })
+            .update({ clientes: clientes, codigos_usados: codigosUsados, ultima_actualizacion: new Date().toISOString() })
             .eq('id', 'main');
-
         if (error) throw error;
         console.log('📤 Cambios subidos a Supabase');
     } catch (error) {
@@ -1247,23 +776,14 @@ async function subirCambiosASupabase() {
     }
 }
 
-// Actualizar estado visual
 function actualizarEstadoSincronizacion(estado) {
     const elemento = document.getElementById('estado-sincronizacion');
     if (!elemento) return;
-    
     elemento.className = 'sincronizacion-estado ' + estado;
-    
     switch(estado) {
-        case 'sincronizado':
-            elemento.innerHTML = '🟢 Sincronizado';
-            break;
-        case 'sincronizando':
-            elemento.innerHTML = '🟡 Sincronizando...';
-            break;
-        case 'error':
-            elemento.innerHTML = '🔴 Sin Supabase';
-            break;
+        case 'sincronizado': elemento.innerHTML = '🟢 Sincronizado'; break;
+        case 'sincronizando': elemento.innerHTML = '🟡 Sincronizando...'; break;
+        case 'error': elemento.innerHTML = '🔴 Sin Supabase'; break;
     }
 }
 
@@ -1275,14 +795,9 @@ function crearElementoEstado() {
     return elemento;
 }
 
-// ========== FUNCIONES UTILITARIAS ==========
 function actualizarInterfaz() {
     actualizarEstadisticas();
-    
-    if (gestionarSection.classList.contains('active')) {
-        cargarListaClientes();
-    }
-    
+    if (gestionarSection.classList.contains('active')) cargarListaClientes();
     if (ingresarSection.classList.contains('active') && clientes.length > 0) {
         const ultimoCliente = clientes[clientes.length - 1];
         if (!codigosUsados.includes(ultimoCliente.identificacion)) {
@@ -1292,7 +807,6 @@ function actualizarInterfaz() {
     }
 }
 
-// Limpiar base de datos (para testing)
 async function limpiarBaseDatos() {
     if (confirm('¿Está seguro de que desea limpiar TODA la base de datos? Se perderán todos los clientes y códigos usados.')) {
         localStorage.removeItem('clientes');
@@ -1305,11 +819,6 @@ async function limpiarBaseDatos() {
         actualizarEstadisticas();
         cargarListaClientes();
         alert('Base de datos limpiada completamente');
-        
-        // También limpiar Supabase
         await subirCambiosASupabase();
     }
 }
-
-// ========== INICIALIZACIÓN FINAL ==========
-document.addEventListener('DOMContentLoaded', initApp);
