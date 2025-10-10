@@ -37,7 +37,7 @@ function showApp() {
     setDisplay('#app-container', 'block');
     $('#user-welcome').textContent = `Hola, ${user.username}`;
     loadFromCloud();
-    showSection('ingresar-section');
+    // No llamar showSection aquí - ya se llama desde setupNavigation
 }
 
 // EVENT LISTENERS
@@ -102,12 +102,21 @@ async function handleLogin() {
             .eq('username', username)
             .single();
             
-        if (error) throw error;
+        if (error) {
+            if (error.code === 'PGRST116') {
+                showMessage('Usuario no encontrado', 'error');
+            } else {
+                throw error;
+            }
+            return;
+        }
+        
         if (!data) {
             showMessage('Usuario no encontrado', 'error');
             return;
         }
         
+        // Simple password verification
         if (data.password_hash === btoa(password)) {
             user = { 
                 id: data.id, 
@@ -122,7 +131,7 @@ async function handleLogin() {
         }
     } catch (error) {
         console.error('Login error:', error);
-        showMessage('Error al iniciar sesión', 'error');
+        showMessage('Error al iniciar sesión: ' + error.message, 'error');
     } finally {
         showLoading(false);
     }
@@ -152,26 +161,34 @@ async function handleRegister() {
     showLoading(true);
     
     try {
-        const { data: existingUser } = await supabase
+        // Check if username exists
+        const { data: existingUser, error: checkError } = await supabase
             .from('nexus_usuarios')
             .select('id')
             .eq('username', username)
             .single();
             
+        if (checkError && checkError.code !== 'PGRST116') {
+            throw checkError;
+        }
+        
         if (existingUser) {
             showMessage('El usuario ya existe', 'error');
             return;
         }
         
-        const { error } = await supabase
+        // Create new user
+        const { data: newUser, error: insertError } = await supabase
             .from('nexus_usuarios')
             .insert([{
                 username: username,
                 password_hash: btoa(password),
                 created_at: new Date().toISOString()
-            }]);
+            }])
+            .select()
+            .single();
             
-        if (error) throw error;
+        if (insertError) throw insertError;
         
         showMessage('Cuenta creada exitosamente', 'success');
         showForm('login');
@@ -179,7 +196,7 @@ async function handleRegister() {
         
     } catch (error) {
         console.error('Register error:', error);
-        showMessage('Error al crear la cuenta', 'error');
+        showMessage('Error al crear la cuenta: ' + error.message, 'error');
     } finally {
         showLoading(false);
     }
@@ -209,6 +226,7 @@ async function handleClientRegistration(e) {
         return;
     }
     
+    // Check if ID already exists
     if (clients.some(client => client.identificacion === id)) {
         showMessage('Esta identificación ya está registrada', 'error');
         return;
@@ -415,20 +433,21 @@ function startQRScanning() {
     scan();
 }
 
-// SYNC SYSTEM
+// SYNC SYSTEM - CORREGIDO
 async function syncToCloud() {
     if (!user) return;
     
     showSyncStatus('Sincronizando...', 'syncing');
     
     try {
+        // Usar la estructura correcta que existe en Supabase
         const { error } = await supabase
             .from('event_data')
             .upsert({
                 id: user.id,
                 clientes: clients,
                 codigos_usados: usedCodes,
-                updated_at: new Date().toISOString(),
+                updated: new Date().toISOString(), // Usar 'updated' en lugar de 'updated_at'
                 usuario: user.username
             });
             
@@ -454,7 +473,14 @@ async function loadFromCloud() {
             .eq('id', user.id)
             .single();
             
-        if (error && error.code !== 'PGRST116') throw error;
+        if (error) {
+            if (error.code === 'PGRST116') {
+                // No hay datos para este usuario, es normal
+                console.log('No hay datos en la nube para este usuario');
+                return;
+            }
+            throw error;
+        }
         
         if (data) {
             clients = data.clientes || [];
@@ -468,22 +494,36 @@ async function loadFromCloud() {
         }
     } catch (error) {
         console.error('Load error:', error);
-        showMessage('Error al cargar datos', 'error');
+        showMessage('Error al cargar datos: ' + error.message, 'error');
     }
 }
 
-// UI FUNCTIONS
+// UI FUNCTIONS - CORREGIDAS
 function showSection(sectionId) {
-    document.querySelectorAll('.content-section').forEach(section => {
-        section.classList.remove('active');
+    // Verificar que el elemento existe
+    const sectionElement = $(sectionId);
+    if (!sectionElement) {
+        console.error('Sección no encontrada:', sectionId);
+        return;
+    }
+    
+    // Hide all sections
+    const allSections = document.querySelectorAll('.content-section');
+    allSections.forEach(section => {
+        if (section) {
+            section.classList.remove('active');
+        }
     });
     
-    $(sectionId).classList.add('active');
+    // Show target section
+    sectionElement.classList.add('active');
     
+    // Stop camera if not in verification section
     if (sectionId !== 'verificar-section') {
         stopCamera();
     }
     
+    // Update stats when showing management section
     if (sectionId === 'gestionar-section') {
         updateStats();
         renderClientsList();
@@ -493,52 +533,90 @@ function showSection(sectionId) {
 function showForm(formType) {
     const forms = ['login-form', 'register-form', 'recover-form'];
     forms.forEach(form => {
-        $(form).classList.add('hidden');
+        const formElement = $(form);
+        if (formElement) {
+            formElement.classList.add('hidden');
+        }
     });
     
-    $(`${formType}-form`).classList.remove('hidden');
-    $('#login-message').classList.add('hidden');
+    const targetForm = $(`${formType}-form`);
+    if (targetForm) {
+        targetForm.classList.remove('hidden');
+    }
+    
+    const messageElement = $('#login-message');
+    if (messageElement) {
+        messageElement.classList.add('hidden');
+    }
 }
 
 function updateStats() {
-    $('#total-registrados').textContent = clients.length;
-    $('#total-ingresaron').textContent = usedCodes.length;
-    $('#total-pendientes').textContent = clients.length - usedCodes.length;
+    const registrados = $('#total-registrados');
+    const ingresaron = $('#total-ingresaron');
+    const pendientes = $('#total-pendientes');
+    
+    if (registrados) registrados.textContent = clients.length;
+    if (ingresaron) ingresaron.textContent = usedCodes.length;
+    if (pendientes) pendientes.textContent = clients.length - usedCodes.length;
 }
 
 function showSyncStatus(message, type) {
     const status = $('#sync-status');
-    status.textContent = message;
-    status.className = `sync-status ${type}`;
-    status.classList.remove('hidden');
+    if (status) {
+        status.textContent = message;
+        status.className = `sync-status ${type}`;
+        status.classList.remove('hidden');
+    }
 }
 
 function hideSyncStatus() {
-    $('#sync-status').classList.add('hidden');
+    const status = $('#sync-status');
+    if (status) {
+        status.classList.add('hidden');
+    }
 }
 
 function showMessage(message, type) {
     const messageEl = $('#login-message');
-    messageEl.textContent = message;
-    messageEl.className = `message ${type}`;
-    messageEl.classList.remove('hidden');
-    
-    setTimeout(() => {
-        messageEl.classList.add('hidden');
-    }, 5000);
+    if (messageEl) {
+        messageEl.textContent = message;
+        messageEl.className = `message ${type}`;
+        messageEl.classList.remove('hidden');
+        
+        setTimeout(() => {
+            messageEl.classList.add('hidden');
+        }, 5000);
+    }
 }
 
 function showLoading(show) {
     // Implement loading indicator if needed
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(btn => {
+        if (show) {
+            btn.disabled = true;
+            btn.classList.add('loading');
+        } else {
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+    });
 }
 
-// UTILITY FUNCTIONS
+// UTILITY FUNCTIONS - CORREGIDAS
 function $(selector) {
-    return document.querySelector(selector);
+    const element = document.querySelector(selector);
+    if (!element) {
+        console.warn('Elemento no encontrado:', selector);
+    }
+    return element;
 }
 
 function setDisplay(selector, display) {
-    $(selector).style.display = display;
+    const element = $(selector);
+    if (element) {
+        element.style.display = display;
+    }
 }
 
 function generateId() {
@@ -546,18 +624,27 @@ function generateId() {
 }
 
 function resetForms() {
-    document.querySelectorAll('form').forEach(form => form.reset());
-    $('#qrcode').innerHTML = '';
-    $('#qr-message').textContent = 'El código QR aparecerá aquí después del registro';
-    $('#qr-message').className = 'qr-message';
+    document.querySelectorAll('form').forEach(form => {
+        if (form) form.reset();
+    });
+    
+    const qrcode = $('#qrcode');
+    if (qrcode) qrcode.innerHTML = '';
+    
+    const qrMessage = $('#qr-message');
+    if (qrMessage) {
+        qrMessage.textContent = 'El código QR aparecerá aquí después del registro';
+        qrMessage.className = 'qr-message';
+    }
 }
 
 // MANUAL VERIFICATION
 function handleManualVerification() {
-    const code = $('#codigo-manual').value.trim();
+    const code = $('#codigo-manual')?.value.trim();
     if (code) {
         verifyCode(code);
-        $('#codigo-manual').value = '';
+        const input = $('#codigo-manual');
+        if (input) input.value = '';
     } else {
         showMessage('Ingresa un código para verificar', 'error');
     }
@@ -565,12 +652,13 @@ function handleManualVerification() {
 
 // SEARCH FUNCTIONALITY
 function handleSearch() {
-    const query = $('#buscar-cliente').value.trim().toLowerCase();
+    const query = $('#buscar-cliente')?.value.trim().toLowerCase() || '';
     renderClientsList(query);
 }
 
 function renderClientsList(query = '') {
     const container = $('#lista-clientes');
+    if (!container) return;
     
     let filteredClients = clients;
     if (query) {
@@ -607,7 +695,7 @@ function renderClientsList(query = '') {
 
 // REENTRY FUNCTIONALITY
 function handleReentry() {
-    const code = $('#codigo-reingreso').value.trim();
+    const code = $('#codigo-reingreso')?.value.trim();
     if (!code) {
         showMessage('Ingresa un código para autorizar reingreso', 'error');
         return;
@@ -620,7 +708,8 @@ function handleReentry() {
         syncToCloud();
         updateStats();
         showMessage('Reingreso autorizado exitosamente', 'success');
-        $('#codigo-reingreso').value = '';
+        const input = $('#codigo-reingreso');
+        if (input) input.value = '';
     } else {
         showMessage('Código no encontrado en ingresos', 'error');
     }
@@ -645,6 +734,7 @@ async function clearDatabase() {
     showLoading(true);
     
     try {
+        // Clear cloud data
         const { error } = await supabase
             .from('event_data')
             .delete()
@@ -652,14 +742,21 @@ async function clearDatabase() {
             
         if (error) throw error;
         
+        // Clear local data
         clients = [];
         usedCodes = [];
         localStorage.removeItem('nexus_clients');
         localStorage.removeItem('nexus_usedCodes');
         
-        $('#qrcode').innerHTML = '';
-        $('#qr-message').textContent = 'El código QR aparecerá aquí después del registro';
-        $('#qr-message').className = 'qr-message';
+        // Clear UI
+        const qrcode = $('#qrcode');
+        if (qrcode) qrcode.innerHTML = '';
+        
+        const qrMessage = $('#qr-message');
+        if (qrMessage) {
+            qrMessage.textContent = 'El código QR aparecerá aquí después del registro';
+            qrMessage.className = 'qr-message';
+        }
         
         await syncToCloud();
         updateStats();
@@ -669,7 +766,7 @@ async function clearDatabase() {
         
     } catch (error) {
         console.error('Clear DB error:', error);
-        showMessage('Error al limpiar la base de datos', 'error');
+        showMessage('Error al limpiar la base de datos: ' + error.message, 'error');
     } finally {
         showLoading(false);
     }
@@ -677,10 +774,10 @@ async function clearDatabase() {
 
 // PASSWORD RECOVERY
 async function handlePasswordRecovery() {
-    const username = $('#recover-username').value.trim();
-    const organizerCode = $('#recover-organizer-code').value.trim();
-    const newPassword = $('#new-password').value.trim();
-    const confirmPassword = $('#confirm-password').value.trim();
+    const username = $('#recover-username')?.value.trim() || '';
+    const organizerCode = $('#recover-organizer-code')?.value.trim() || '';
+    const newPassword = $('#new-password')?.value.trim() || '';
+    const confirmPassword = $('#confirm-password')?.value.trim() || '';
     
     if (!username || !organizerCode || !newPassword || !confirmPassword) {
         showMessage('Completa todos los campos', 'error');
@@ -709,8 +806,7 @@ async function handlePasswordRecovery() {
         const { error } = await supabase
             .from('nexus_usuarios')
             .update({ 
-                password_hash: btoa(newPassword),
-                updated_at: new Date().toISOString()
+                password_hash: btoa(newPassword)
             })
             .eq('username', username);
             
@@ -718,11 +814,12 @@ async function handlePasswordRecovery() {
         
         showMessage('Contraseña actualizada exitosamente', 'success');
         showForm('login');
-        $('#recover-form').reset();
+        const recoverForm = $('#recover-form');
+        if (recoverForm) recoverForm.reset();
         
     } catch (error) {
         console.error('Password recovery error:', error);
-        showMessage('Error al recuperar contraseña', 'error');
+        showMessage('Error al recuperar contraseña: ' + error.message, 'error');
     } finally {
         showLoading(false);
     }
@@ -739,9 +836,9 @@ window.addEventListener('offline', () => {
     showMessage('Modo offline activado', 'warning');
 });
 
-// PERIODIC SYNC
+// PERIODIC SYNC - SOLO SI ESTÁ LOGUEADO
 setInterval(() => {
     if (user && navigator.onLine) {
         syncToCloud();
     }
-}, 30000);
+}, 30000); // Sync every 30 seconds
