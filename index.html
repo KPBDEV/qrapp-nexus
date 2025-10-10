@@ -11,159 +11,224 @@
 </head>
 <body>
     <!-- LOGIN -->
-    <div id="login-screen" class="login-container">
-        <div class="login-box">
-            <div class="nexus-logo">NEXUS</div>
-            <p class="login-subtitle">Sistema de Gestión para Eventos</p>
+    <div id="login-screen" class="screen active">
+        <div class="container">
+            <div class="logo">NEXUS</div>
+            <p class="subtitle">Sistema de Gestión para Eventos</p>
             
-            <form id="login-form" class="nexus-form-group">
-                <h3 class="login-title">Iniciar Sesión</h3>
-                <input type="text" id="login-username" class="nexus-input" placeholder="Usuario">
-                <input type="password" id="login-password" class="nexus-input" placeholder="Contraseña">
-                
-                <div style="text-align: right; margin: 10px 0;">
-                    <button type="button" id="btn-olvide-password" class="btn-link">¿Olvidaste tu contraseña?</button>
+            <div id="login-form" class="form-container">
+                <h2 class="form-title">Iniciar Sesión</h2>
+                <div class="input-group">
+                    <input type="text" id="login-username" class="input" placeholder="Usuario" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="login-password" class="input" placeholder="Contraseña" required>
                 </div>
                 
-                <button type="button" id="btn-login" class="nexus-btn btn-primary">Acceder</button>
-                <button type="button" id="btn-show-register" class="nexus-btn btn-secondary">Crear Cuenta</button>
-            </form>
-
-            <div id="register-form" class="nexus-form-group" style="display: none;">
-                <h3 class="login-title">Crear Cuenta</h3>
-                <input type="text" id="register-username" class="nexus-input" placeholder="Usuario">
-                <input type="password" id="register-password" class="nexus-input" placeholder="Contraseña (6+ caracteres)">
-                <input type="password" id="organizer-code" class="nexus-input" placeholder="Código Organizador">
-                <button type="button" id="btn-register" class="nexus-btn btn-success">Crear Cuenta</button>
-                <button type="button" id="btn-show-login" class="nexus-btn btn-secondary">Volver al Login</button>
+                <button type="button" id="btn-olvide-password" class="link-btn">¿Olvidaste tu contraseña?</button>
+                
+                <button type="button" id="btn-login" class="btn primary large">Acceder al Sistema</button>
+                <button type="button" id="btn-show-register" class="btn secondary large">Crear Cuenta Nueva</button>
             </div>
 
-            <div id="recover-form" class="nexus-form-group" style="display: none;">
-                <h3 class="login-title">Recuperar Contraseña</h3>
-                <input type="text" id="recover-username" class="nexus-input" placeholder="Usuario">
-                <input type="password" id="recover-organizer-code" class="nexus-input" placeholder="Código Organizador">
-                <input type="password" id="new-password" class="nexus-input" placeholder="Nueva Contraseña">
-                <input type="password" id="confirm-password" class="nexus-input" placeholder="Confirmar Contraseña">
-                <button type="button" id="btn-recover-password" class="nexus-btn btn-warning">Restablecer</button>
-                <button type="button" id="btn-show-login-from-recover" class="nexus-btn btn-secondary">Volver al Login</button>
+            <div id="register-form" class="form-container hidden">
+                <h2 class="form-title">Crear Cuenta</h2>
+                <div class="input-group">
+                    <input type="text" id="register-username" class="input" placeholder="Usuario" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="register-password" class="input" placeholder="Contraseña (6+ caracteres)" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="organizer-code" class="input" placeholder="Código Organizador" required>
+                </div>
+                <button type="button" id="btn-register" class="btn success large">Crear Cuenta</button>
+                <button type="button" id="btn-show-login" class="btn secondary large">Volver al Login</button>
             </div>
 
-            <div id="login-message" class="message"></div>
+            <div id="recover-form" class="form-container hidden">
+                <h2 class="form-title">Recuperar Contraseña</h2>
+                <div class="input-group">
+                    <input type="text" id="recover-username" class="input" placeholder="Usuario" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="recover-organizer-code" class="input" placeholder="Código Organizador" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="new-password" class="input" placeholder="Nueva Contraseña" required>
+                </div>
+                <div class="input-group">
+                    <input type="password" id="confirm-password" class="input" placeholder="Confirmar Contraseña" required>
+                </div>
+                <button type="button" id="btn-recover-password" class="btn warning large">Restablecer Contraseña</button>
+                <button type="button" id="btn-show-login-from-recover" class="btn secondary large">Volver al Login</button>
+            </div>
+
+            <div id="login-message" class="message hidden"></div>
         </div>
     </div>
 
     <!-- APP PRINCIPAL -->
-    <div id="app-container" style="display: none;">
-        <header class="nexus-header">
-            <div class="nexus-logo">NEXUS</div>
-            <p class="nexus-subtitle">Sistema de Gestión para Eventos</p>
-            <div class="user-info">
-                <span id="user-welcome"></span>
-                <button id="btn-logout" class="nexus-btn btn-secondary">Cerrar Sesión</button>
+    <div id="app-container" class="screen">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-small">NEXUS</div>
+                <div class="user-info">
+                    <span id="user-welcome" class="welcome-text"></span>
+                    <button id="btn-logout" class="btn secondary small">Cerrar Sesión</button>
+                </div>
             </div>
         </header>
-        
-        <div class="nexus-container">
-            <!-- NAVEGACIÓN -->
-            <div class="nav-container">
-                <button id="btn-ingresar" class="nexus-btn btn-primary">Ingresar Datos</button>
-                <button id="btn-verificar" class="nexus-btn btn-success">Verificar QR</button>
-                <button id="btn-gestionar" class="nexus-btn btn-warning">Gestionar</button>
-            </div>
-            
-            <!-- SECCIÓN INGRESAR -->
-            <div id="ingresar-section" class="nexus-section active">
-                <h2>Registrar Cliente</h2>
-                <form id="client-form">
-                    <input type="text" id="nombre" class="nexus-input" placeholder="Nombre completo" required>
-                    <input type="text" id="identificacion" class="nexus-input" placeholder="Número de identificación" required>
-                    <input type="tel" id="telefono" class="nexus-input" placeholder="Teléfono" required>
-                    <button type="submit" class="nexus-btn btn-primary">Generar QR</button>
+
+        <!-- NAVEGACIÓN MÓVIL -->
+        <nav class="bottom-nav">
+            <button id="btn-ingresar" class="nav-btn active" data-section="ingresar-section">
+                <span class="nav-icon">➕</span>
+                <span class="nav-text">Registrar</span>
+            </button>
+            <button id="btn-verificar" class="nav-btn" data-section="verificar-section">
+                <span class="nav-icon">📷</span>
+                <span class="nav-text">Escanear</span>
+            </button>
+            <button id="btn-gestionar" class="nav-btn" data-section="gestionar-section">
+                <span class="nav-icon">📊</span>
+                <span class="nav-text">Gestionar</span>
+            </button>
+        </nav>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="main-content">
+            <!-- SECCIÓN REGISTRAR -->
+            <section id="ingresar-section" class="content-section active">
+                <div class="section-header">
+                    <h2>Registrar Cliente</h2>
+                </div>
+                
+                <form id="client-form" class="form">
+                    <div class="input-group">
+                        <label class="input-label">Nombre completo</label>
+                        <input type="text" id="nombre" class="input" placeholder="Ingresa el nombre" required>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Número de identificación</label>
+                        <input type="text" id="identificacion" class="input" placeholder="Número de ID" required>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Teléfono</label>
+                        <input type="tel" id="telefono" class="input" placeholder="Número de teléfono" required>
+                    </div>
+                    <button type="submit" class="btn primary large full-width">Generar Código QR</button>
                 </form>
                 
-                <div class="qr-container">
-                    <p id="qr-message">El código QR aparecerá aquí</p>
-                    <div id="qrcode"></div>
+                <div class="qr-section">
+                    <p id="qr-message" class="qr-message">El código QR aparecerá aquí después del registro</p>
+                    <div id="qrcode" class="qr-container"></div>
                 </div>
-            </div>
-            
-            <!-- SECCIÓN VERIFICAR -->
-            <div id="verificar-section" class="nexus-section">
-                <h2>Verificar Acceso</h2>
-                <div class="scanner-container">
-                    <div id="scanner">
-                        <video id="video" playsinline style="display: none;"></video>
-                        <canvas id="canvas" style="display: none;"></canvas>
-                        <div id="camera-placeholder">Cámara no activada</div>
+            </section>
+
+            <!-- SECCIÓN ESCANEAR -->
+            <section id="verificar-section" class="content-section">
+                <div class="section-header">
+                    <h2>Escanear QR</h2>
+                </div>
+                
+                <div class="scanner-section">
+                    <div id="scanner" class="scanner">
+                        <video id="video" playsinline class="scanner-video hidden"></video>
+                        <canvas id="canvas" class="scanner-canvas hidden"></canvas>
+                        <div id="camera-placeholder" class="camera-placeholder">
+                            <div class="placeholder-icon">📷</div>
+                            <p>Cámara no activada</p>
+                            <small>Toca "Activar Cámara" para comenzar</small>
+                        </div>
                     </div>
-                    <div class="scanner-controls">
-                        <button id="btn-start-camera" class="nexus-btn btn-primary">Activar Cámara</button>
-                        <button id="btn-stop-camera" class="nexus-btn btn-secondary" style="display: none;">Desactivar</button>
-                    </div>
-                    <p class="instructions">Escanea el código QR o ingresa manualmente</p>
-                    <input type="text" id="codigo-manual" class="nexus-input" placeholder="Código manual">
-                    <button id="btn-verificar-manual" class="nexus-btn btn-success">Verificar</button>
                     
-                    <div id="verification-result" class="result-message">
-                        <h3 id="result-title">Resultado</h3>
-                        <p id="result-message"></p>
-                        <div id="client-details"></div>
+                    <div class="scanner-controls">
+                        <button id="btn-start-camera" class="btn primary">Activar Cámara</button>
+                        <button id="btn-stop-camera" class="btn secondary hidden">Desactivar Cámara</button>
+                    </div>
+                    
+                    <div class="manual-verify">
+                        <h3>O ingresa manualmente</h3>
+                        <div class="input-group">
+                            <input type="text" id="codigo-manual" class="input" placeholder="Código del cliente">
+                        </div>
+                        <button id="btn-verificar-manual" class="btn success full-width">Verificar Código</button>
+                    </div>
+                    
+                    <div id="verification-result" class="result-card hidden">
+                        <div class="result-icon"></div>
+                        <h3 id="result-title" class="result-title"></h3>
+                        <p id="result-message" class="result-message"></p>
+                        <div id="client-details" class="client-details"></div>
                     </div>
                 </div>
-            </div>
+            </section>
 
             <!-- SECCIÓN GESTIONAR -->
-            <div id="gestionar-section" class="nexus-section">
-                <h2>Gestión de Accesos</h2>
+            <section id="gestionar-section" class="content-section">
+                <div class="section-header">
+                    <h2>Gestión de Accesos</h2>
+                </div>
                 
                 <!-- ESTADÍSTICAS -->
-                <div class="stats-grid">
+                <div class="stats-cards">
                     <div class="stat-card">
-                        <h3>Registrados</h3>
-                        <span id="total-registrados" class="stat-number">0</span>
+                        <div class="stat-number" id="total-registrados">0</div>
+                        <div class="stat-label">Registrados</div>
                     </div>
                     <div class="stat-card">
-                        <h3>Ingresaron</h3>
-                        <span id="total-ingresaron" class="stat-number">0</span>
+                        <div class="stat-number" id="total-ingresaron">0</div>
+                        <div class="stat-label">Ingresaron</div>
                     </div>
                     <div class="stat-card">
-                        <h3>Pendientes</h3>
-                        <span id="total-pendientes" class="stat-number">0</span>
+                        <div class="stat-number" id="total-pendientes">0</div>
+                        <div class="stat-label">Pendientes</div>
                     </div>
                 </div>
 
                 <!-- BÚSQUEDA -->
-                <div class="search-box">
-                    <input type="text" id="buscar-cliente" class="nexus-input" placeholder="Buscar cliente...">
-                    <button id="btn-buscar" class="nexus-btn btn-primary">Buscar</button>
+                <div class="search-section">
+                    <div class="input-group">
+                        <input type="text" id="buscar-cliente" class="input" placeholder="Buscar por nombre o ID...">
+                    </div>
+                    <button id="btn-buscar" class="btn primary full-width">Buscar Clientes</button>
                 </div>
 
                 <!-- LISTA CLIENTES -->
-                <div class="client-list">
-                    <h3>Clientes Registrados</h3>
-                    <div id="lista-clientes"></div>
+                <div class="clients-section">
+                    <h3 class="section-subtitle">Clientes Registrados</h3>
+                    <div id="lista-clientes" class="clients-list">
+                        <div class="empty-state">No hay clientes registrados</div>
+                    </div>
                 </div>
 
                 <!-- REINGRESOS -->
                 <div class="reentry-section">
-                    <h3>Autorizar Reingreso</h3>
-                    <input type="text" id="codigo-reingreso" class="nexus-input" placeholder="Código del cliente">
-                    <button id="btn-autorizar-reingreso" class="nexus-btn btn-success">Autorizar</button>
+                    <h3 class="section-subtitle">Autorizar Reingreso</h3>
+                    <div class="input-group">
+                        <input type="text" id="codigo-reingreso" class="input" placeholder="Código del cliente">
+                    </div>
+                    <button id="btn-autorizar-reingreso" class="btn warning full-width">Autorizar Reingreso</button>
                 </div>
 
                 <!-- ADMINISTRACIÓN -->
                 <div class="admin-section">
-                    <h3>Administración</h3>
-                    <button id="btn-forzar-sincronizacion" class="nexus-btn btn-primary">Sincronizar</button>
-                    <button id="btn-sincronizacion-forzada" class="nexus-btn btn-warning">Sincronización Forzada</button>
-                    <button id="btn-limpiar-db" class="nexus-btn btn-danger">Limpiar Base de Datos</button>
+                    <h3 class="section-subtitle">Administración</h3>
+                    <div class="admin-buttons">
+                        <button id="btn-forzar-sincronizacion" class="btn primary">Sincronizar Ahora</button>
+                        <button id="btn-sincronizacion-forzada" class="btn warning">Sincronización Forzada</button>
+                        <button id="btn-limpiar-db" class="btn danger">Limpiar Base de Datos</button>
+                    </div>
                 </div>
-            </div>
-        </div>
-        
-        <footer class="nexus-footer">
-            <p>NEXUS - Sistema profesional de gestión para eventos</p>
-        </footer>
+            </section>
+        </main>
+    </div>
+
+    <!-- INDICADOR DE SINCRONIZACIÓN -->
+    <div id="sync-status" class="sync-status hidden">
+        <span class="sync-text">Sincronizando...</span>
     </div>
 
     <script src="script.js"></script>
