@@ -442,11 +442,14 @@ async function subirCambiosASupabase() {
 
 // Funciones básicas de la app principal (para que no de error)
 function handleManualVerification() {
-    const codigo = document.getElementById('codigo-manual')?.value.trim();
+    const codigoManual = document.getElementById('codigo-manual');
+    const codigo = codigoManual ? codigoManual.value.trim() : '';
+    
     if (!codigo) {
         alert('Por favor ingrese un código para verificar');
         return;
     }
+    
     verificarCodigo(codigo);
 }
 
@@ -477,7 +480,15 @@ function cargarListaClientes(filtro = '') {
 }
 
 function autorizarReingreso() {
-    alert('Funcionalidad de reingreso');
+    const codigoReingreso = document.getElementById('codigo-reingreso');
+    const codigo = codigoReingreso ? codigoReingreso.value.trim() : '';
+    
+    if (!codigo) {
+        alert('Por favor ingrese un código para autorizar reingreso');
+        return;
+    }
+    
+    autorizarReingresoCliente(codigo);
 }
 
 // Funciones de cámara básicas
@@ -666,3 +677,115 @@ function mostrarFeedbackQRDetectado() {
     }
 }
 
+function buscarClientes() {
+    const buscarCliente = document.getElementById('buscar-cliente');
+    const filtro = buscarCliente ? buscarCliente.value.trim() : '';
+    console.log('🔍 Buscando clientes:', filtro);
+    cargarListaClientes(filtro);
+}
+
+async function verificarCodigo(codigo) {
+    if (codigosUsados.includes(codigo)) {
+        const verificationResult = document.getElementById('verification-result');
+        const resultTitle = document.getElementById('result-title');
+        const resultMessage = document.getElementById('result-message');
+        const clientDetails = document.getElementById('client-details');
+        
+        if (verificationResult && resultTitle && resultMessage && clientDetails) {
+            verificationResult.className = 'verification-result error';
+            resultTitle.textContent = '❌ CÓDIGO YA USADO';
+            resultMessage.textContent = 'Este código QR ya fue utilizado para ingresar al evento.';
+            clientDetails.innerHTML = `
+                <p><strong>Acceso denegado:</strong> Código de un solo uso</p>
+                <p><strong>Medida de seguridad:</strong> Evita reutilización fraudulenta</p>
+            `;
+            verificationResult.style.display = 'block';
+        }
+        
+        const codigoManual = document.getElementById('codigo-manual');
+        if (codigoManual) codigoManual.value = '';
+        
+        setTimeout(() => {
+            if (verificationResult) verificationResult.style.display = 'none';
+        }, 8000);
+        return;
+    }
+    
+    const cliente = clientes.find(c => c.identificacion === codigo);
+    
+    if (cliente) {
+        codigosUsados.push(codigo);
+        localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
+        
+        cliente.usado = true;
+        cliente.fechaUso = new Date().toISOString();
+        localStorage.setItem('clientes', JSON.stringify(clientes));
+        
+        const verificationResult = document.getElementById('verification-result');
+        const resultTitle = document.getElementById('result-title');
+        const resultMessage = document.getElementById('result-message');
+        const clientDetails = document.getElementById('client-details');
+        
+        if (verificationResult && resultTitle && resultMessage && clientDetails) {
+            verificationResult.className = 'verification-result success';
+            resultTitle.textContent = '✅ ACCESO AUTORIZADO';
+            resultMessage.textContent = 'Bienvenido/a al evento';
+            clientDetails.innerHTML = `
+                <p><strong>Nombre:</strong> ${cliente.nombre}</p>
+                <p><strong>Identificación:</strong> ${cliente.identificacion}</p>
+                <p><strong>Teléfono:</strong> ${cliente.telefono}</p>
+                <p><strong>Hora de ingreso:</strong> ${new Date().toLocaleTimeString()}</p>
+                <p><strong>⚠️ Este código ya no podrá ser reutilizado</strong></p>
+            `;
+            verificationResult.style.display = 'block';
+        }
+        
+        playBeepSound();
+        
+    } else {
+        const verificationResult = document.getElementById('verification-result');
+        const resultTitle = document.getElementById('result-title');
+        const resultMessage = document.getElementById('result-message');
+        const clientDetails = document.getElementById('client-details');
+        
+        if (verificationResult && resultTitle && resultMessage && clientDetails) {
+            verificationResult.className = 'verification-result error';
+            resultTitle.textContent = '❌ CÓDIGO INVÁLIDO';
+            resultMessage.textContent = 'El código no está registrado en nuestra base de datos.';
+            clientDetails.innerHTML = '';
+            verificationResult.style.display = 'block';
+        }
+    }
+    
+    const codigoManual = document.getElementById('codigo-manual');
+    if (codigoManual) codigoManual.value = '';
+    
+    setTimeout(() => {
+        const verificationResult = document.getElementById('verification-result');
+        if (verificationResult) verificationResult.style.display = 'none';
+    }, 8000);
+    
+    await subirCambiosASupabase();
+}
+
+function playBeepSound() {
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (error) {
+        console.log('Audio no disponible');
+    }
+}
