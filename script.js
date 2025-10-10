@@ -284,9 +284,20 @@ let clientes = JSON.parse(localStorage.getItem('clientes')) || [];
 let codigosUsados = JSON.parse(localStorage.getItem('codigosUsados')) || [];
 
 function initMainApp() {
-    console.log('Iniciando aplicación NEXUS principal...');
+    console.log('🚀 Iniciando aplicación NEXUS principal...');
+    console.log('📊 Estado inicial - Clientes:', clientes.length, 'Códigos:', codigosUsados.length);
+    
     setupMainEventListeners();
     
+    // FORZAR SINCRONIZACIÓN AL INICIAR
+    if (usuarioActual) {
+        console.log('👤 Usuario autenticado, iniciando sincronización...');
+        iniciarSincronizacionAutomatica();
+    } else {
+        console.log('⚠️ Usuario no autenticado, sincronización desactivada');
+    }
+    
+    // Mostrar último QR si existe
     if (clientes.length > 0) {
         const ultimoCliente = clientes[clientes.length - 1];
         if (!codigosUsados.includes(ultimoCliente.identificacion)) {
@@ -297,6 +308,8 @@ function initMainApp() {
             document.getElementById('qr-message').style.color = '#ef4444';
         }
     }
+    
+    console.log('✅ Aplicación principal iniciada');
 }
 
 function setupMainEventListeners() {
@@ -312,6 +325,8 @@ function setupMainEventListeners() {
         'btn-buscar': (el) => el.addEventListener('click', buscarClientes),
         'btn-autorizar-reingreso': (el) => el.addEventListener('click', autorizarReingreso),
         'btn-limpiar-db': (el) => el.addEventListener('click', limpiarBaseDatos),
+        'btn-forzar-sincronizacion': (el) => el.addEventListener('click', forzarSincronizacionManual),
+        'btn-debug-sincronizacion': (el) => el.addEventListener('click', debugSincronizacion),
         'buscar-cliente': (el) => el.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') buscarClientes();
         })
@@ -472,18 +487,33 @@ let animationFrame = null;
 
 async function subirCambiosASupabase() {
     try {
-        const { error } = await supabase
+        console.log('📤 Subiendo cambios a Supabase...');
+        console.log('- Clientes a subir:', clientes.length);
+        console.log('- Códigos a subir:', codigosUsados.length);
+        
+        const { data, error } = await supabase
             .from('event_data')
-            .update({ 
-                clientes: clientes, 
-                codigos_usados: codigosUsados, 
-                ultima_actualizacion: new Date().toISOString() 
+            .upsert({
+                id: 'main',
+                clientes: clientes,
+                codigos_usados: codigosUsados,
+                ultima_actualizacion: new Date().toISOString()
             })
-            .eq('id', 'main');
-        if (error) throw error;
-        console.log('📤 Cambios subidos a Supabase');
+            .select();
+
+        if (error) {
+            console.error('❌ Error subiendo cambios:', error);
+            throw error;
+        }
+        
+        console.log('✅ Cambios subidos exitosamente a Supabase');
+        actualizarEstadoSincronizacion('sincronizado');
+        return data;
+        
     } catch (error) {
-        console.error('Error subiendo cambios:', error);
+        console.error('💥 Error subiendo cambios:', error);
+        actualizarEstadoSincronizacion('error');
+        throw error;
     }
 }
 
@@ -752,10 +782,101 @@ function stopCamera() {
 
 // Inicialización de sincronización
 async function iniciarSincronizacionAutomatica() {
-    if (sincronizacionActiva || !usuarioActual) return;
+    if (sincronizacionActiva || !usuarioActual) {
+        console.log('⚠️ Sincronización ya activa o usuario no logueado');
+        return;
+    }
+    
     sincronizacionActiva = true;
-    console.log('🔄 Sincronización iniciada');
-    await subirCambiosASupabase();
+    console.log('🔄 INICIANDO SINCRONIZACIÓN AUTOMÁTICA...');
+    
+    try {
+        // 1. Crear elemento de estado visual
+        crearElementoEstado();
+        
+        // 2. Cargar datos iniciales desde Supabase
+        await cargarDatosIniciales();
+        
+        // 3. Escuchar cambios en tiempo real
+        const subscription = escucharCambiosEnTiempoReal();
+        
+        // 4. Sincronizar cada 30 segundos por si falla el realtime
+        const intervalo = setInterval(async () => {
+            if (!sincronizacionActiva) {
+                clearInterval(intervalo);
+                return;
+            }
+            console.log('🔄 Sincronización periódica...');
+            await cargarDatosIniciales();
+        }, 30000);
+        
+        // Guardar referencia para limpiar después
+        window.nexusSincronizacion = {
+            subscription,
+            intervalo,
+            limpiar: () => {
+                if (subscription) subscription.unsubscribe();
+                clearInterval(intervalo);
+                sincronizacionActiva = false;
+            }
+        };
+        
+        console.log('✅ Sincronización automática INICIADA');
+        
+    } catch (error) {
+        console.error('❌ Error iniciando sincronización:', error);
+        sincronizacionActiva = false;
+    }
+}
+
+async function cargarDatosIniciales() {
+    try {
+        console.log('📥 Cargando datos iniciales desde Supabase...');
+        
+        const { data, error } = await supabase
+            .from('event_data')
+            .select('*')
+            .eq('id', 'main')
+            .single();
+
+        if (error && error.code !== 'PGRST116') {
+            console.error('❌ Error cargando datos:', error);
+            actualizarEstadoSincronizacion('error');
+            return;
+        }
+
+        if (data) {
+            console.log('✅ Datos cargados desde Supabase:');
+            console.log('- Clientes:', data.clientes?.length || 0);
+            console.log('- Códigos usados:', data.codigos_usados?.length || 0);
+            
+            // Actualizar datos locales SOLO si Supabase tiene más datos
+            const clientesSupabase = data.clientes || [];
+            const codigosSupabase = data.codigos_usados || [];
+            
+            if (clientesSupabase.length >= clientes.length && codigosSupabase.length >= codigosUsados.length) {
+                clientes = clientesSupabase;
+                codigosUsados = codigosSupabase;
+                
+                localStorage.setItem('clientes', JSON.stringify(clientes));
+                localStorage.setItem('codigosUsados', JSON.stringify(codigosUsados));
+                
+                console.log('✅ Datos locales actualizados desde Supabase');
+                actualizarInterfaz();
+            } else {
+                console.log('🔄 Datos locales más recientes, subiendo a Supabase...');
+                await subirCambiosASupabase();
+            }
+            
+            actualizarEstadoSincronizacion('sincronizado');
+        } else {
+            console.log('📝 No hay datos en Supabase, creando documento inicial...');
+            await crearDocumentoInicial();
+        }
+    } catch (error) {
+        console.error('💥 Error en carga inicial:', error);
+        actualizarEstadoSincronizacion('error');
+    }
 }
 
 function agregarOverlayConTransparencia() {
@@ -1163,4 +1284,55 @@ function showLoginFormFromRecover() {
     if (registerForm) registerForm.style.display = 'none';
     if (recoverForm) recoverForm.style.display = 'none';
     if (loginMessage) loginMessage.style.display = 'none';
+}
+
+// Función de debug para sincronización
+function debugSincronizacion() {
+    console.log('🐛 DEBUG - Estado de sincronización:');
+    console.log('Usuario actual:', usuarioActual);
+    console.log('Sincronización activa:', sincronizacionActiva);
+    console.log('Clientes en localStorage:', clientes.length);
+    console.log('Códigos usados en localStorage:', codigosUsados.length);
+    
+    // Verificar datos en Supabase
+    verificarDatosSupabase();
+}
+
+async function verificarDatosSupabase() {
+    try {
+        const { data, error } = await supabase
+            .from('event_data')
+            .select('*')
+            .eq('id', 'main')
+            .single();
+
+        if (error) {
+            console.log('❌ Error al verificar Supabase:', error);
+            return;
+        }
+
+        if (data) {
+            console.log('📊 Datos en Supabase:');
+            console.log('- Clientes:', data.clientes?.length || 0);
+            console.log('- Códigos usados:', data.codigos_usados?.length || 0);
+            console.log('- Última actualización:', data.ultima_actualizacion);
+        } else {
+            console.log('❌ No hay datos en Supabase');
+        }
+    } catch (error) {
+        console.error('Error en verificación:', error);
+    }
+}
+
+async function forzarSincronizacionManual() {
+    console.log('🔄 FORZANDO SINCRONIZACIÓN MANUAL...');
+    actualizarEstadoSincronizacion('sincronizando');
+    
+    try {
+        await subirCambiosASupabase();
+        await cargarDatosIniciales();
+        alert('✅ Sincronización manual completada');
+    } catch (error) {
+        alert('❌ Error en sincronización manual');
+    }
 }
