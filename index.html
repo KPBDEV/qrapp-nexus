@@ -4,233 +4,549 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NEXUS - Gestión de Eventos</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* RESET */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        
+        /* VARIABLES */
+        :root {
+            --primary: #8b5cf6;
+            --primary-dark: #7c3aed;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --dark: #0f172a;
+            --card: #1e293b;
+            --text: #f8fafc;
+            --border: #334155;
+        }
+        
+        /* BASE */
+        body { background: var(--dark); color: var(--text); min-height: 100vh; }
+        
+        /* UTILITIES */
+        .hidden { display: none !important; }
+        .text-center { text-align: center; }
+        .full-width { width: 100%; }
+        .mt-2 { margin-top: 20px; }
+        
+        /* CONTAINERS */
+        .screen { min-height: 100vh; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .container { max-width: 400px; width: 100%; }
+        .card { background: var(--card); padding: 30px; border-radius: 15px; border: 1px solid var(--border); }
+        
+        /* LOGIN SCREEN */
+        #login-screen { background: linear-gradient(135deg, var(--dark) 0%, #1e1b4b 100%); }
+        .logo { font-size: 3rem; font-weight: bold; background: linear-gradient(135deg, var(--primary), #06b6d4); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-align: center; margin-bottom: 10px; }
+        .subtitle { color: #94a3b8; text-align: center; margin-bottom: 30px; }
+        
+        /* FORMS */
+        .form-group { margin-bottom: 20px; }
+        .input { width: 100%; padding: 15px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 1rem; }
+        .input:focus { outline: none; border-color: var(--primary); }
+        
+        /* BUTTONS */
+        .btn { padding: 15px 25px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.3s; width: 100%; margin: 5px 0; }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-secondary { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+        
+        /* APP LAYOUT */
+        #app-container { display: none; padding-bottom: 80px; }
+        .app-header { background: var(--card); padding: 15px 20px; width: 100%; text-align: center; border-bottom: 1px solid var(--border); }
+        .welcome-text { color: #94a3b8; }
+        
+        /* NAVIGATION */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); display: flex; padding: 10px; border-top: 1px solid var(--border); }
+        .nav-btn { flex: 1; background: none; border: none; color: #94a3b8; padding: 10px; cursor: pointer; }
+        .nav-btn.active { color: var(--primary); }
+        
+        /* SECTIONS */
+        .section { display: none; width: 100%; max-width: 500px; margin: 20px auto; }
+        .section.active { display: block; }
+        
+        /* QR */
+        .qr-container { text-align: center; margin: 20px 0; }
+        #qrcode { display: flex; justify-content: center; margin: 20px 0; }
+        #qrcode canvas { border: 2px solid var(--primary); border-radius: 10px; background: white; padding: 10px; }
+        
+        /* CAMERA */
+        .scanner { width: 100%; height: 300px; background: #000; border-radius: 10px; margin: 20px 0; position: relative; }
+        .scanner-video { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+        .camera-placeholder { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; color: #94a3b8; }
+        
+        /* STATS */
+        .stats { display: flex; gap: 10px; margin: 20px 0; }
+        .stat-card { flex: 1; background: var(--card); padding: 20px; border-radius: 10px; text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: bold; color: var(--primary); }
+        
+        /* CLIENTS LIST */
+        .client-item { background: rgba(255,255,255,0.05); padding: 15px; margin: 10px 0; border-radius: 10px; border-left: 4px solid var(--primary); }
+        .client-item.used { border-left-color: var(--danger); }
+        
+        /* RESULTS */
+        .result { padding: 15px; margin: 10px 0; border-radius: 10px; text-align: center; display: none; }
+        .result.success { background: var(--success); display: block; }
+        .result.error { background: var(--danger); display: block; }
+    </style>
 </head>
 <body>
-    <!-- LOGIN -->
-    <div id="login-screen" class="screen active">
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="screen">
         <div class="container">
             <div class="logo">NEXUS</div>
             <p class="subtitle">Sistema de Gestión para Eventos</p>
             
-            <div id="login-form" class="form-container">
-                <h2 class="form-title">Iniciar Sesión</h2>
-                <div class="input-group">
-                    <input type="text" id="login-username" class="input" placeholder="Usuario" required>
+            <div class="card">
+                <h2 class="text-center">Iniciar Sesión</h2>
+                <div class="form-group">
+                    <input type="text" id="login-username" class="input" placeholder="Usuario">
                 </div>
-                <div class="input-group">
-                    <input type="password" id="login-password" class="input" placeholder="Contraseña" required>
+                <div class="form-group">
+                    <input type="password" id="login-password" class="input" placeholder="Contraseña">
                 </div>
-                
-                <button type="button" id="btn-olvide-password" class="link-btn">¿Olvidaste tu contraseña?</button>
-                
-                <button type="button" id="btn-login" class="btn primary large">Acceder al Sistema</button>
-                <button type="button" id="btn-show-register" class="btn secondary large">Crear Cuenta Nueva</button>
+                <button id="btn-login" class="btn btn-primary">Acceder al Sistema</button>
+                <button id="btn-show-register" class="btn btn-secondary">Crear Cuenta</button>
             </div>
 
-            <div id="register-form" class="form-container hidden">
-                <h2 class="form-title">Crear Cuenta</h2>
-                <div class="input-group">
-                    <input type="text" id="register-username" class="input" placeholder="Usuario" required>
+            <div id="register-form" class="card hidden">
+                <h2 class="text-center">Crear Cuenta</h2>
+                <div class="form-group">
+                    <input type="text" id="register-username" class="input" placeholder="Usuario">
                 </div>
-                <div class="input-group">
-                    <input type="password" id="register-password" class="input" placeholder="Contraseña (6+ caracteres)" required>
+                <div class="form-group">
+                    <input type="password" id="register-password" class="input" placeholder="Contraseña (6+ caracteres)">
                 </div>
-                <div class="input-group">
-                    <input type="password" id="organizer-code" class="input" placeholder="Código Organizador" required>
+                <div class="form-group">
+                    <input type="password" id="organizer-code" class="input" placeholder="Código Organizador">
                 </div>
-                <button type="button" id="btn-register" class="btn success large">Crear Cuenta</button>
-                <button type="button" id="btn-show-login" class="btn secondary large">Volver al Login</button>
+                <button id="btn-register" class="btn btn-success">Crear Cuenta</button>
+                <button id="btn-show-login" class="btn btn-secondary">Volver al Login</button>
             </div>
-
-            <div id="recover-form" class="form-container hidden">
-                <h2 class="form-title">Recuperar Contraseña</h2>
-                <div class="input-group">
-                    <input type="text" id="recover-username" class="input" placeholder="Usuario" required>
-                </div>
-                <div class="input-group">
-                    <input type="password" id="recover-organizer-code" class="input" placeholder="Código Organizador" required>
-                </div>
-                <div class="input-group">
-                    <input type="password" id="new-password" class="input" placeholder="Nueva Contraseña" required>
-                </div>
-                <div class="input-group">
-                    <input type="password" id="confirm-password" class="input" placeholder="Confirmar Contraseña" required>
-                </div>
-                <button type="button" id="btn-recover-password" class="btn warning large">Restablecer Contraseña</button>
-                <button type="button" id="btn-show-login-from-recover" class="btn secondary large">Volver al Login</button>
-            </div>
-
-            <div id="login-message" class="message hidden"></div>
         </div>
     </div>
 
-    <!-- APP PRINCIPAL -->
+    <!-- APP SCREEN -->
     <div id="app-container" class="screen">
-        <!-- HEADER -->
         <header class="app-header">
-            <div class="header-content">
-                <div class="logo-small">NEXUS</div>
-                <div class="user-info">
-                    <span id="user-welcome" class="welcome-text"></span>
-                    <button id="btn-logout" class="btn secondary small">Cerrar Sesión</button>
-                </div>
+            <div class="logo" style="font-size: 1.5rem;">NEXUS</div>
+            <div>
+                <span id="user-welcome" class="welcome-text"></span>
+                <button id="btn-logout" class="btn btn-secondary" style="width: auto; padding: 8px 15px; margin: 0 10px;">Cerrar Sesión</button>
             </div>
         </header>
 
-        <!-- NAVEGACIÓN MÓVIL -->
+        <!-- NAVIGATION -->
         <nav class="bottom-nav">
-            <button id="btn-ingresar" class="nav-btn active" data-section="ingresar-section">
-                <span class="nav-icon">➕</span>
-                <span class="nav-text">Registrar</span>
-            </button>
-            <button id="btn-verificar" class="nav-btn" data-section="verificar-section">
-                <span class="nav-icon">📷</span>
-                <span class="nav-text">Escanear</span>
-            </button>
-            <button id="btn-gestionar" class="nav-btn" data-section="gestionar-section">
-                <span class="nav-icon">📊</span>
-                <span class="nav-text">Gestionar</span>
-            </button>
+            <button id="btn-ingresar" class="nav-btn active">➕ Registrar</button>
+            <button id="btn-verificar" class="nav-btn">📷 Escanear</button>
+            <button id="btn-gestionar" class="nav-btn">📊 Gestionar</button>
         </nav>
 
-        <!-- CONTENIDO PRINCIPAL -->
-        <main class="main-content">
-            <!-- SECCIÓN REGISTRAR -->
-            <section id="ingresar-section" class="content-section active">
-                <div class="section-header">
-                    <h2>Registrar Cliente</h2>
-                </div>
-                
-                <form id="client-form" class="form">
-                    <div class="input-group">
-                        <label class="input-label">Nombre completo</label>
-                        <input type="text" id="nombre" class="input" placeholder="Ingresa el nombre" required>
+        <!-- SECTIONS -->
+        <main style="width: 100%; max-width: 500px; margin: 0 auto;">
+            <!-- REGISTER SECTION -->
+            <section id="ingresar-section" class="section active">
+                <div class="card">
+                    <h2 class="text-center">Registrar Cliente</h2>
+                    <form id="client-form">
+                        <div class="form-group">
+                            <input type="text" id="nombre" class="input" placeholder="Nombre completo" required>
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="identificacion" class="input" placeholder="Número de identificación" required>
+                        </div>
+                        <div class="form-group">
+                            <input type="tel" id="telefono" class="input" placeholder="Teléfono" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Generar Código QR</button>
+                    </form>
+                    
+                    <div class="qr-container">
+                        <p id="qr-message">El código QR aparecerá aquí</p>
+                        <div id="qrcode"></div>
                     </div>
-                    <div class="input-group">
-                        <label class="input-label">Número de identificación</label>
-                        <input type="text" id="identificacion" class="input" placeholder="Número de ID" required>
-                    </div>
-                    <div class="input-group">
-                        <label class="input-label">Teléfono</label>
-                        <input type="tel" id="telefono" class="input" placeholder="Número de teléfono" required>
-                    </div>
-                    <button type="submit" class="btn primary large full-width">Generar Código QR</button>
-                </form>
-                
-                <div class="qr-section">
-                    <p id="qr-message" class="qr-message">El código QR aparecerá aquí después del registro</p>
-                    <div id="qrcode" class="qr-container"></div>
                 </div>
             </section>
 
-            <!-- SECCIÓN ESCANEAR -->
-            <section id="verificar-section" class="content-section">
-                <div class="section-header">
-                    <h2>Escanear QR</h2>
-                </div>
-                
-                <div class="scanner-section">
-                    <div id="scanner" class="scanner">
-                        <video id="video" playsinline class="scanner-video hidden"></video>
-                        <canvas id="canvas" class="scanner-canvas hidden"></canvas>
+            <!-- SCAN SECTION -->
+            <section id="verificar-section" class="section">
+                <div class="card">
+                    <h2 class="text-center">Escanear QR</h2>
+                    
+                    <div class="scanner">
+                        <video id="video" class="scanner-video hidden"></video>
                         <div id="camera-placeholder" class="camera-placeholder">
-                            <div class="placeholder-icon">📷</div>
-                            <p>Cámara no activada</p>
-                            <small>Toca "Activar Cámara" para comenzar</small>
+                            <div>📷<br>Cámara no activada</div>
                         </div>
                     </div>
                     
-                    <div class="scanner-controls">
-                        <button id="btn-start-camera" class="btn primary">Activar Cámara</button>
-                        <button id="btn-stop-camera" class="btn secondary hidden">Desactivar Cámara</button>
+                    <div style="display: flex; gap: 10px; margin: 15px 0;">
+                        <button id="btn-start-camera" class="btn btn-primary">Activar Cámara</button>
+                        <button id="btn-stop-camera" class="btn btn-secondary hidden">Desactivar</button>
                     </div>
                     
-                    <div class="manual-verify">
-                        <h3>O ingresa manualmente</h3>
-                        <div class="input-group">
-                            <input type="text" id="codigo-manual" class="input" placeholder="Código del cliente">
-                        </div>
-                        <button id="btn-verificar-manual" class="btn success full-width">Verificar Código</button>
+                    <div class="form-group">
+                        <input type="text" id="codigo-manual" class="input" placeholder="O ingresa código manualmente">
                     </div>
+                    <button id="btn-verificar-manual" class="btn btn-success">Verificar Código</button>
                     
-                    <div id="verification-result" class="result-card hidden">
-                        <div class="result-icon"></div>
-                        <h3 id="result-title" class="result-title"></h3>
-                        <p id="result-message" class="result-message"></p>
-                        <div id="client-details" class="client-details"></div>
-                    </div>
+                    <div id="verification-result" class="result"></div>
                 </div>
             </section>
 
-            <!-- SECCIÓN GESTIONAR -->
-            <section id="gestionar-section" class="content-section">
-                <div class="section-header">
-                    <h2>Gestión de Accesos</h2>
-                </div>
-                
-                <!-- ESTADÍSTICAS -->
-                <div class="stats-cards">
-                    <div class="stat-card">
-                        <div class="stat-number" id="total-registrados">0</div>
-                        <div class="stat-label">Registrados</div>
+            <!-- MANAGE SECTION -->
+            <section id="gestionar-section" class="section">
+                <div class="card">
+                    <h2 class="text-center">Gestión</h2>
+                    
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-registrados">0</div>
+                            <div>Registrados</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-ingresaron">0</div>
+                            <div>Ingresaron</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-pendientes">0</div>
+                            <div>Pendientes</div>
+                        </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-number" id="total-ingresaron">0</div>
-                        <div class="stat-label">Ingresaron</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number" id="total-pendientes">0</div>
-                        <div class="stat-label">Pendientes</div>
-                    </div>
-                </div>
 
-                <!-- BÚSQUEDA -->
-                <div class="search-section">
-                    <div class="input-group">
-                        <input type="text" id="buscar-cliente" class="input" placeholder="Buscar por nombre o ID...">
+                    <div class="form-group">
+                        <input type="text" id="buscar-cliente" class="input" placeholder="Buscar cliente...">
                     </div>
-                    <button id="btn-buscar" class="btn primary full-width">Buscar Clientes</button>
-                </div>
+                    <button id="btn-buscar" class="btn btn-primary">Buscar</button>
 
-                <!-- LISTA CLIENTES -->
-                <div class="clients-section">
-                    <h3 class="section-subtitle">Clientes Registrados</h3>
-                    <div id="lista-clientes" class="clients-list">
-                        <div class="empty-state">No hay clientes registrados</div>
+                    <div style="margin: 20px 0;">
+                        <h3 class="text-center">Clientes Registrados</h3>
+                        <div id="lista-clientes" style="max-height: 300px; overflow-y: auto;">
+                            <div class="text-center" style="color: #94a3b8; padding: 20px;">No hay clientes</div>
+                        </div>
                     </div>
-                </div>
 
-                <!-- REINGRESOS -->
-                <div class="reentry-section">
-                    <h3 class="section-subtitle">Autorizar Reingreso</h3>
-                    <div class="input-group">
-                        <input type="text" id="codigo-reingreso" class="input" placeholder="Código del cliente">
+                    <div class="form-group">
+                        <input type="text" id="codigo-reingreso" class="input" placeholder="Código para reingreso">
                     </div>
-                    <button id="btn-autorizar-reingreso" class="btn warning full-width">Autorizar Reingreso</button>
-                </div>
+                    <button id="btn-autorizar-reingreso" class="btn btn-warning">Autorizar Reingreso</button>
 
-                <!-- ADMINISTRACIÓN -->
-                <div class="admin-section">
-                    <h3 class="section-subtitle">Administración</h3>
-                    <div class="admin-buttons">
-                        <button id="btn-forzar-sincronizacion" class="btn primary">Sincronizar Ahora</button>
-                        <button id="btn-sincronizacion-forzada" class="btn warning">Sincronización Forzada</button>
-                        <button id="btn-limpiar-db" class="btn danger">Limpiar Base de Datos</button>
+                    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                        <h3 class="text-center">Administración</h3>
+                        <button id="btn-forzar-sincronizacion" class="btn btn-primary">Sincronizar</button>
+                        <button id="btn-limpiar-db" class="btn btn-danger">Limpiar Base</button>
                     </div>
                 </div>
             </section>
         </main>
     </div>
 
-    <!-- INDICADOR DE SINCRONIZACIÓN -->
-    <div id="sync-status" class="sync-status hidden">
-        <span class="sync-text">Sincronizando...</span>
-    </div>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // CONFIG
+        const SUPABASE_URL = 'https://zefsmzxlhgfvmdydutzp.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InplZnNtenhsaGdmdm1keWR1dHpwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk5ODE1NDIsImV4cCI6MjA3NTU1NzU0Mn0.nm7syRkN1ZBnJ5QLk4QStITuUB1cjHZjNfrPA99CpdI';
 
-    <script src="script.js"></script>
+        // STATE
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let user = JSON.parse(sessionStorage.getItem('user')) || null;
+        let clients = JSON.parse(localStorage.getItem('clients')) || [];
+        let usedCodes = JSON.parse(localStorage.getItem('usedCodes')) || [];
+
+        // INIT
+        document.addEventListener('DOMContentLoaded', () => {
+            user ? showApp() : showLogin();
+            setupEvents();
+        });
+
+        // NAVIGATION
+        function showLogin() {
+            $('#login-screen').style.display = 'flex';
+            $('#app-container').style.display = 'none';
+        }
+
+        function showApp() {
+            $('#login-screen').style.display = 'none';
+            $('#app-container').style.display = 'block';
+            $('#user-welcome').textContent = `Hola, ${user.username}`;
+            loadFromCloud();
+        }
+
+        // AUTH
+        $('#btn-login').onclick = async () => {
+            const username = $('#login-username').value;
+            const password = $('#login-password').value;
+            
+            const { data } = await supabase.from('nexus_usuarios').select('*').eq('username', username).single();
+            if (!data) return alert('Usuario no existe');
+            
+            if (data.password_hash === btoa(password)) {
+                user = { id: data.id, username: data.username };
+                sessionStorage.setItem('user', JSON.stringify(user));
+                showApp();
+            } else {
+                alert('Contraseña incorrecta');
+            }
+        };
+
+        $('#btn-register').onclick = async () => {
+            const username = $('#register-username').value;
+            const password = $('#register-password').value;
+            const code = $('#organizer-code').value;
+            
+            if (code !== "NEXUS.082208") return alert('Código incorrecto');
+            if (password.length < 6) return alert('Contraseña muy corta');
+            
+            const { error } = await supabase.from('nexus_usuarios').insert([{
+                username: username,
+                password_hash: btoa(password)
+            }]);
+            
+            if (error) return alert('Error: ' + error.message);
+            
+            alert('Cuenta creada!');
+            showForm('login-form');
+            $('#login-username').value = username;
+        };
+
+        $('#btn-logout').onclick = () => {
+            user = null;
+            sessionStorage.removeItem('user');
+            showLogin();
+        };
+
+        // FORM TOGGLES
+        $('#btn-show-register').onclick = () => showForm('register-form');
+        $('#btn-show-login').onclick = () => showForm('login-form');
+
+        function showForm(formId) {
+            $('#login-form').classList.toggle('hidden', formId !== 'login-form');
+            $('#register-form').classList.toggle('hidden', formId !== 'register-form');
+        }
+
+        // CLIENTS
+        $('#client-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const name = $('#nombre').value;
+            const id = $('#identificacion').value;
+            const phone = $('#telefono').value;
+            
+            if (!name || !id || !phone) return alert('Completa todos los campos');
+            if (usedCodes.includes(id)) return alert('Esta ID ya fue usada');
+            
+            clients.push({ id: Date.now(), nombre: name, identificacion: id, telefono: phone, fecha: new Date().toISOString() });
+            localStorage.setItem('clients', JSON.stringify(clients));
+            
+            generateQR(id);
+            e.target.reset();
+            await syncToCloud();
+        };
+
+        function generateQR(text) {
+            const container = $('#qrcode');
+            container.innerHTML = '';
+            
+            const qr = qrcode(0, 'L');
+            qr.addData(text);
+            qr.make();
+            
+            const canvas = document.createElement('canvas');
+            const size = 250;
+            canvas.width = canvas.height = size;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, size, size);
+            ctx.fillStyle = '#000000';
+            
+            const cellSize = size / qr.getModuleCount();
+            for (let row = 0; row < qr.getModuleCount(); row++) {
+                for (let col = 0; col < qr.getModuleCount(); col++) {
+                    if (qr.isDark(row, col)) {
+                        ctx.fillRect(col * cellSize, row * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+            
+            container.appendChild(canvas);
+            $('#qr-message').textContent = `QR para: ${text}`;
+        }
+
+        // SYNC
+        async function syncToCloud() {
+            try {
+                await supabase.from('event_data').upsert({
+                    id: 'main',
+                    clientes: clients,
+                    codigos_usados: usedCodes,
+                    updated: new Date().toISOString()
+                });
+            } catch (error) {
+                console.error('Sync error:', error);
+            }
+        }
+
+        async function loadFromCloud() {
+            try {
+                const { data } = await supabase.from('event_data').select('*').eq('id', 'main').single();
+                if (data) {
+                    clients = data.clientes || [];
+                    usedCodes = data.codigos_usados || [];
+                    localStorage.setItem('clients', JSON.stringify(clients));
+                    localStorage.setItem('usedCodes', JSON.stringify(usedCodes));
+                    updateStats();
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+            }
+        }
+
+        // VERIFICATION
+        async function verifyCode(code) {
+            if (usedCodes.includes(code)) {
+                showResult('❌ Código ya usado', 'error');
+                return;
+            }
+            
+            const client = clients.find(c => c.identificacion === code);
+            if (client) {
+                usedCodes.push(code);
+                localStorage.setItem('usedCodes', JSON.stringify(usedCodes));
+                showResult(`✅ Bienvenido ${client.nombre}`, 'success');
+                await syncToCloud();
+            } else {
+                showResult('❌ Código no válido', 'error');
+            }
+        }
+
+        function showResult(message, type) {
+            const result = $('#verification-result');
+            result.textContent = message;
+            result.className = `result ${type}`;
+        }
+
+        // CAMERA
+        let cameraStream = null;
+
+        $('#btn-start-camera').onclick = async () => {
+            try {
+                stopCamera();
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                const video = $('#video');
+                video.srcObject = cameraStream;
+                video.classList.remove('hidden');
+                $('#camera-placeholder').classList.add('hidden');
+                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    scanQR();
+                };
+            } catch (error) {
+                alert('Error cámara: ' + error.message);
+            }
+        };
+
+        $('#btn-stop-camera').onclick = stopCamera;
+
+        function stopCamera() {
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            $('#video').classList.add('hidden');
+            $('#camera-placeholder').classList.remove('hidden');
+        }
+
+        function scanQR() {
+            if (!cameraStream) return;
+            
+            const video = $('#video');
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            try {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+                if (code) {
+                    verifyCode(code.data);
+                    stopCamera();
+                    return;
+                }
+            } catch (e) {}
+            
+            requestAnimationFrame(scanQR);
+        }
+
+        // MANUAL VERIFICATION
+        $('#btn-verificar-manual').onclick = () => {
+            const code = $('#codigo-manual').value;
+            if (code) verifyCode(code);
+        };
+
+        // UTILS
+        function $(id) { return document.getElementById(id); }
+
+        function updateStats() {
+            $('#total-registrados').textContent = clients.length;
+            $('#total-ingresaron').textContent = usedCodes.length;
+            $('#total-pendientes').textContent = clients.length - usedCodes.length;
+        }
+
+        function setupEvents() {
+            // Navigation
+            $('#btn-ingresar').onclick = () => showSection('ingresar-section');
+            $('#btn-verificar').onclick = () => showSection('verificar-section');
+            $('#btn-gestionar').onclick = () => {
+                showSection('gestionar-section');
+                updateStats();
+            };
+            
+            // Sync
+            $('#btn-forzar-sincronizacion').onclick = async () => {
+                await syncToCloud();
+                await loadFromCloud();
+                alert('Sincronizado');
+            };
+            
+            // Clear DB
+            $('#btn-limpiar-db').onclick = async () => {
+                if (confirm('¿Borrar TODOS los datos?')) {
+                    clients = [];
+                    usedCodes = [];
+                    localStorage.removeItem('clients');
+                    localStorage.removeItem('usedCodes');
+                    $('#qrcode').innerHTML = '';
+                    await syncToCloud();
+                    updateStats();
+                    alert('Base de datos limpiada');
+                }
+            };
+        }
+
+        function showSection(sectionId) {
+            // Hide all sections
+            ['ingresar-section', 'verificar-section', 'gestionar-section'].forEach(id => {
+                $(id).classList.remove('active');
+            });
+            
+            // Show target section
+            $(sectionId).classList.add('active');
+            
+            // Stop camera if not in verification section
+            if (sectionId !== 'verificar-section') {
+                stopCamera();
+            }
+        }
+    </script>
 </body>
 </html>
