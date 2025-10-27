@@ -10,7 +10,60 @@ let usedCodes = JSON.parse(localStorage.getItem('nexus_usedCodes')) || [];
 let cameraStream = null;
 let scanAnimation = null;
 
-// INIT
+// UTILITY FUNCTIONS CORREGIDAS
+function $(selector) {
+    const element = document.querySelector(selector);
+    if (!element && !selector.includes('sync-status')) {
+        console.error(`❌ Elemento no encontrado: ${selector}`);
+    }
+    return element;
+}
+
+function $$(selector) {
+    return document.querySelectorAll(selector);
+}
+
+function setDisplay(selector, display) {
+    const element = $(selector);
+    if (element) {
+        element.style.display = display;
+    }
+}
+
+// DIAGNÓSTICO
+function diagnoseApp() {
+    console.log('🔍 DIAGNÓSTICO COMPLETO:');
+    
+    // Verificar elementos críticos
+    const criticalElements = [
+        'body',
+        '#login-screen',
+        '#app-container',
+        '#ingresar-section',
+        '#verificar-section', 
+        '#gestionar-section',
+        '.main-content',
+        '.bottom-nav',
+        '.nav-btn'
+    ];
+    
+    criticalElements.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        console.log(`${selector}: ${elements.length} elementos encontrados`);
+        
+        elements.forEach((el, index) => {
+            console.log(`  [${index}] - id: ${el.id}, class: ${el.className}`);
+            console.log(`       display: ${el.style.display}, visible: ${el.offsetParent !== null}`);
+        });
+    });
+    
+    // Verificar datos de usuario
+    console.log('👤 Usuario:', user);
+    console.log('💾 Clientes:', clients.length);
+    console.log('🔑 Códigos usados:', usedCodes.length);
+}
+
+// INIT CORREGIDO
 document.addEventListener('DOMContentLoaded', () => {
     console.log('📄 DOM cargado - Iniciando Nexus');
     
@@ -21,9 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
     checkAuthState();
     setupEventListeners();
     setupNavigation();
-    initializeApp(); // ← Agregar esta línea
+    initializeApp();
     
     console.log('✅ Nexus completamente inicializado');
+    
+    // Diagnóstico después de un momento
+    setTimeout(() => {
+        diagnoseApp();
+    }, 1000);
 });
 
 // AUTH MANAGEMENT
@@ -42,38 +100,44 @@ function showLogin() {
 }
 
 function showApp() {
-    console.log('🔧 Mostrando aplicación...'); // Debug
+    console.log('🔧 Mostrando aplicación...');
     
-    setDisplay('#login-screen', 'none');
-    setDisplay('#app-container', 'block');
+    // Ocultar login
+    const loginScreen = document.getElementById('login-screen');
+    if (loginScreen) {
+        loginScreen.style.display = 'none';
+    }
     
-    // Asegurar que el contenido sea visible
-    $('#app-container').style.opacity = '1';
-    $('#app-container').style.visibility = 'visible';
+    // Mostrar app
+    const appContainer = document.getElementById('app-container');
+    if (appContainer) {
+        appContainer.style.display = 'block';
+        appContainer.style.visibility = 'visible';
+        appContainer.style.opacity = '1';
+    }
     
     // Actualizar bienvenida
-    if ($('#user-welcome')) {
-        $('#user-welcome').textContent = `Hola, ${user.username}`;
+    const welcomeElement = document.getElementById('user-welcome');
+    if (welcomeElement && user) {
+        welcomeElement.textContent = `Hola, ${user.username}`;
     }
     
-    // Forzar mostrar la sección activa
+    // Mostrar sección principal
     showSection('ingresar-section');
     
-    // Activar el botón de navegación correspondiente
-    const navBtn = document.querySelector('[data-section="ingresar-section"]');
-    if (navBtn) {
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        navBtn.classList.add('active');
-    }
-    
-    // Cargar datos y actualizar UI
+    // Activar navegación
     setTimeout(() => {
+        const navBtn = document.querySelector('[data-section="ingresar-section"]');
+        if (navBtn) {
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            navBtn.classList.add('active');
+        }
+        
+        // Cargar datos
         loadFromCloud();
-        updateStats();
-        renderClientsList();
     }, 100);
     
-    console.log('✅ Aplicación mostrada correctamente'); // Debug
+    console.log('✅ Aplicación mostrada correctamente');
 }
 
 // EVENT LISTENERS
@@ -105,47 +169,29 @@ function setupEventListeners() {
     $('#btn-limpiar-db').onclick = clearDatabase;
 }
 
-function initializeApp() {
-    console.log('🚀 Inicializando aplicación...');
-    
-    // Asegurar que los estilos se apliquen correctamente
-    document.body.style.visibility = 'visible';
-    
-    // Forzar mostrar la sección principal si estamos en la app
-    if (user && user.id) {
-        setTimeout(() => {
-            showSection('ingresar-section');
-            
-            // Activar navegación
-            const navBtn = document.querySelector('[data-section="ingresar-section"]');
-            if (navBtn) {
-                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-                navBtn.classList.add('active');
-            }
-            
-            // Actualizar datos
-            updateStats();
-            renderClientsList();
-        }, 500);
-    }
-    
-    console.log('✅ Aplicación inicializada');
-}
-
 function setupNavigation() {
+    console.log('🔧 Configurando navegación...');
+    
     const navButtons = document.querySelectorAll('.nav-btn');
+    console.log(`📌 Botones de navegación encontrados: ${navButtons.length}`);
+    
     navButtons.forEach(btn => {
-        btn.onclick = () => {
+        btn.addEventListener('click', () => {
             const section = btn.getAttribute('data-section');
+            console.log(`🔄 Navegando a: ${section}`);
+            
             showSection(section);
             
+            // Actualizar estado activo
             navButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-        };
+        });
     });
+    
+    console.log('✅ Navegación configurada');
 }
 
-// AUTH FUNCTIONS - ADAPTADO A TU ESTRUCTURA
+// AUTH FUNCTIONS
 async function handleLogin() {
     const username = $('#login-username').value.trim();
     const password = $('#login-password').value.trim();
@@ -173,28 +219,28 @@ async function handleLogin() {
             return;
         }
         
-        // Verificar contraseña - usando la estructura de tu tabla
+        // Verificar contraseña
         if (data.password_hash === btoa(password)) {
-    user = { 
-        id: data.id, 
-        username: data.username
-    };
-    sessionStorage.setItem('nexus_user', JSON.stringify(user));
-    
-    // Forzar una reinicialización completa
-    showApp();
-    
-    // Esperar un frame y luego inicializar
-    setTimeout(() => {
-        showSection('ingresar-section');
-        updateStats();
-        renderClientsList();
-        showMessage(`Bienvenido ${data.username}`, 'success');
-    }, 100);
-    
-    } else {
-    showMessage('Contraseña incorrecta', 'error');
-    }
+            user = { 
+                id: data.id, 
+                username: data.username
+            };
+            sessionStorage.setItem('nexus_user', JSON.stringify(user));
+            
+            // Forzar una reinicialización completa
+            showApp();
+            
+            // Esperar un frame y luego inicializar
+            setTimeout(() => {
+                showSection('ingresar-section');
+                updateStats();
+                renderClientsList();
+                showMessage(`Bienvenido ${data.username}`, 'success');
+            }, 100);
+            
+        } else {
+            showMessage('Contraseña incorrecta', 'error');
+        }
     } catch (error) {
         console.error('Login error:', error);
         showMessage('Error al iniciar sesión', 'error');
@@ -238,7 +284,7 @@ async function handleRegister() {
             return;
         }
         
-        // Create new user - adaptado a tu estructura
+        // Create new user
         const { data: newUser, error } = await supabase
             .from('nexus_usuarios')
             .insert([{
@@ -268,6 +314,86 @@ function handleLogout() {
     user = null;
     sessionStorage.removeItem('nexus_user');
     showLogin();
+}
+
+// SECTION MANAGEMENT CORREGIDO
+function showSection(sectionId) {
+    console.log(`🔧 Mostrando sección: ${sectionId}`);
+    
+    // Verificar que la sección existe
+    const targetSection = document.getElementById(sectionId.replace('#', ''));
+    if (!targetSection) {
+        console.error(`❌ Sección no encontrada: ${sectionId}`);
+        
+        // Intentar fallback - mostrar cualquier sección disponible
+        const availableSections = document.querySelectorAll('.content-section');
+        if (availableSections.length > 0) {
+            const firstSection = availableSections[0];
+            const firstSectionId = firstSection.id;
+            console.log(`🔄 Fallback: Mostrando ${firstSectionId}`);
+            
+            // Ocultar todas
+            availableSections.forEach(section => {
+                section.style.display = 'none';
+                section.classList.remove('active');
+            });
+            
+            // Mostrar primera disponible
+            firstSection.style.display = 'block';
+            firstSection.classList.add('active');
+        }
+        return;
+    }
+    
+    // Ocultar todas las secciones
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.style.display = 'none';
+        section.classList.remove('active');
+    });
+    
+    // Mostrar la sección seleccionada
+    targetSection.style.display = 'block';
+    targetSection.classList.add('active');
+    
+    console.log(`✅ Sección ${sectionId} mostrada correctamente`);
+    
+    // Detener cámara si no estamos en verificar
+    if (sectionId !== 'verificar-section') {
+        stopCamera();
+    }
+    
+    // Actualizar UI específica
+    if (sectionId === 'gestionar-section') {
+        updateStats();
+        renderClientsList();
+    }
+}
+
+function initializeApp() {
+    console.log('🚀 Inicializando aplicación...');
+    
+    // Asegurar que los estilos se apliquen correctamente
+    document.body.style.visibility = 'visible';
+    
+    // Forzar mostrar la sección principal si estamos en la app
+    if (user && user.id) {
+        setTimeout(() => {
+            showSection('ingresar-section');
+            
+            // Activar navegación
+            const navBtn = document.querySelector('[data-section="ingresar-section"]');
+            if (navBtn) {
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                navBtn.classList.add('active');
+            }
+            
+            // Actualizar datos
+            updateStats();
+            renderClientsList();
+        }, 500);
+    }
+    
+    console.log('✅ Aplicación inicializada');
 }
 
 // CLIENT MANAGEMENT
@@ -485,20 +611,18 @@ function startQRScanning() {
     scan();
 }
 
-// SYNC SYSTEM - ADAPTADO A TU ESTRUCTURA DE event_data
+// SYNC SYSTEM
 async function syncToCloud() {
     if (!user) return;
     
     showSyncStatus('Sincronizando...', 'syncing');
     
     try {
-        // Usar la estructura EXACTA de tu tabla event_data
         const syncData = {
-            id: 'main', // Usamos 'main' como ID fijo según tu estructura
+            id: 'main',
             clientes: clients,
             codigos_usados: usedCodes,
             ultima_actualizacion: new Date().toISOString()
-            // No incluimos created_at porque ya existe en tu tabla
         };
         
         const { error } = await supabase
@@ -526,12 +650,11 @@ async function loadFromCloud() {
         const { data, error } = await supabase
             .from('event_data')
             .select('*')
-            .eq('id', 'main') // Buscar por ID 'main' según tu estructura
+            .eq('id', 'main')
             .single();
             
         if (error) {
             if (error.code === 'PGRST116') {
-                // No hay datos, es normal para el primer uso
                 console.log('No hay datos en la nube, empezando fresco');
                 return;
             }
@@ -555,41 +678,6 @@ async function loadFromCloud() {
 }
 
 // UI FUNCTIONS
-function showSection(sectionId) {
-    console.log(`🔧 Mostrando sección: ${sectionId}`); // Debug
-    
-    // Ocultar todas las secciones
-    document.querySelectorAll('.content-section').forEach(section => {
-        section.style.display = 'none';
-        section.classList.remove('active');
-    });
-    
-    // Mostrar la sección seleccionada
-    const targetSection = $(sectionId);
-    if (targetSection) {
-        targetSection.style.display = 'block';
-        targetSection.classList.add('active');
-        
-        // Forzar reflow para asegurar la animación
-        targetSection.offsetHeight;
-        
-        console.log(`✅ Sección ${sectionId} mostrada`); // Debug
-    } else {
-        console.error(`❌ Sección no encontrada: ${sectionId}`);
-    }
-    
-    // Detener cámara si no estamos en verificar
-    if (sectionId !== 'verificar-section') {
-        stopCamera();
-    }
-    
-    // Actualizar UI específica de cada sección
-    if (sectionId === 'gestionar-section') {
-        updateStats();
-        renderClientsList();
-    }
-}
-
 function showForm(formType) {
     ['login-form', 'register-form', 'recover-form'].forEach(form => {
         $(form).classList.add('hidden');
@@ -635,14 +723,6 @@ function showLoading(show) {
 }
 
 // UTILITY FUNCTIONS
-function $(selector) {
-    return document.querySelector(selector);
-}
-
-function setDisplay(selector, display) {
-    $(selector).style.display = display;
-}
-
 function generateId() {
     return Date.now() + Math.random().toString(36).substr(2, 9);
 }
@@ -836,31 +916,4 @@ setInterval(() => {
     if (user && navigator.onLine) {
         syncToCloud();
     }
-}, 30000); // Sync every 30 seconds
-
-function debugAppState() {
-    console.log('🔍 DEBUG - Estado de la aplicación:');
-    console.log('Usuario:', user);
-    console.log('App Container display:', $('#app-container').style.display);
-    console.log('Login Screen display:', $('#login-screen').style.display);
-    console.log('Secciones activas:', document.querySelectorAll('.content-section.active').length);
-    console.log('Body visible:', document.body.style.visibility);
-    
-    // Verificar elementos críticos
-    const criticalElements = [
-        '#app-container',
-        '#ingresar-section', 
-        '.main-content',
-        '.bottom-nav'
-    ];
-    
-    criticalElements.forEach(selector => {
-        const el = $(selector);
-        console.log(`${selector}:`, el ? 'ENCONTRADO' : 'NO ENCONTRADO');
-        if (el) {
-            console.log(`  - display: ${el.style.display}`);
-            console.log(`  - visibility: ${el.style.visibility}`);
-            console.log(`  - opacity: ${el.style.opacity}`);
-        }
-    });
-}
+}, 30000);
