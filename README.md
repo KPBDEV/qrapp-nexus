@@ -1,2 +1,2 @@
-# qrapp-evento
+# qrapp-nexus
 app de administración para eventos locales
