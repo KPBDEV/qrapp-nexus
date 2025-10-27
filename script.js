@@ -92,15 +92,38 @@ document.addEventListener('DOMContentLoaded', () => {
 // AUTH MANAGEMENT
 function checkAuthState() {
     if (user && user.id) {
+        console.log('✅ Usuario autenticado, mostrando app');
         showApp();
     } else {
+        console.log('❌ Usuario no autenticado, mostrando login');
         showLogin();
     }
 }
 
 function showLogin() {
-    setDisplay('#login-screen', 'flex');
-    setDisplay('#app-container', 'none');
+    console.log('🔧 Mostrando pantalla de login...');
+    
+    // Ocultar app completamente
+    const appContainer = document.getElementById('app-container');
+    if (appContainer) {
+        appContainer.style.display = 'none';
+        appContainer.style.visibility = 'hidden';
+        appContainer.style.opacity = '0';
+        appContainer.classList.add('hidden');
+    }
+    
+    // Mostrar login completamente
+    const loginScreen = document.getElementById('login-screen');
+    if (loginScreen) {
+        loginScreen.style.display = 'flex';
+        loginScreen.style.visibility = 'visible';
+        appContainer.style.opacity = '1';
+        loginScreen.classList.remove('hidden');
+        
+        // Mostrar formulario de login por defecto
+        showForm('login');
+    }
+    
     resetForms();
 }
 
@@ -319,10 +342,40 @@ async function handleRegister() {
 }
 
 function handleLogout() {
+    console.log('🚪 Cerrando sesión...');
+    
+    // Detener cámara si está activa
     stopCamera();
+    
+    // Limpiar datos de usuario
     user = null;
     sessionStorage.removeItem('nexus_user');
-    showLogin();
+    
+    // OCULTAR APP COMPLETAMENTE
+    const appContainer = document.getElementById('app-container');
+    if (appContainer) {
+        appContainer.style.display = 'none';
+        appContainer.style.visibility = 'hidden';
+        appContainer.style.opacity = '0';
+        appContainer.classList.add('hidden');
+    }
+    
+    // MOSTRAR LOGIN COMPLETAMENTE
+    const loginScreen = document.getElementById('login-screen');
+    if (loginScreen) {
+        loginScreen.style.display = 'flex';
+        loginScreen.style.visibility = 'visible';
+        loginScreen.style.opacity = '1';
+        loginScreen.classList.remove('hidden');
+        
+        // Mostrar el formulario de login por defecto
+        showForm('login');
+        
+        // Resetear forms
+        resetForms();
+    }
+    
+    console.log('✅ Sesión cerrada correctamente');
 }
 
 // SECTION MANAGEMENT CORREGIDO
