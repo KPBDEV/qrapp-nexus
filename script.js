@@ -12,9 +12,18 @@ let scanAnimation = null;
 
 // INIT
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('📄 DOM cargado - Iniciando Nexus');
+    
+    // Asegurar que el body sea visible
+    document.body.style.opacity = '1';
+    document.body.style.visibility = 'visible';
+    
     checkAuthState();
     setupEventListeners();
     setupNavigation();
+    initializeApp(); // ← Agregar esta línea
+    
+    console.log('✅ Nexus completamente inicializado');
 });
 
 // AUTH MANAGEMENT
@@ -33,10 +42,38 @@ function showLogin() {
 }
 
 function showApp() {
+    console.log('🔧 Mostrando aplicación...'); // Debug
+    
     setDisplay('#login-screen', 'none');
     setDisplay('#app-container', 'block');
-    $('#user-welcome').textContent = `Hola, ${user.username}`;
-    loadFromCloud();
+    
+    // Asegurar que el contenido sea visible
+    $('#app-container').style.opacity = '1';
+    $('#app-container').style.visibility = 'visible';
+    
+    // Actualizar bienvenida
+    if ($('#user-welcome')) {
+        $('#user-welcome').textContent = `Hola, ${user.username}`;
+    }
+    
+    // Forzar mostrar la sección activa
+    showSection('ingresar-section');
+    
+    // Activar el botón de navegación correspondiente
+    const navBtn = document.querySelector('[data-section="ingresar-section"]');
+    if (navBtn) {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        navBtn.classList.add('active');
+    }
+    
+    // Cargar datos y actualizar UI
+    setTimeout(() => {
+        loadFromCloud();
+        updateStats();
+        renderClientsList();
+    }, 100);
+    
+    console.log('✅ Aplicación mostrada correctamente'); // Debug
 }
 
 // EVENT LISTENERS
@@ -66,6 +103,33 @@ function setupEventListeners() {
     // Admin Functions
     $('#btn-forzar-sincronizacion').onclick = forceSync;
     $('#btn-limpiar-db').onclick = clearDatabase;
+}
+
+function initializeApp() {
+    console.log('🚀 Inicializando aplicación...');
+    
+    // Asegurar que los estilos se apliquen correctamente
+    document.body.style.visibility = 'visible';
+    
+    // Forzar mostrar la sección principal si estamos en la app
+    if (user && user.id) {
+        setTimeout(() => {
+            showSection('ingresar-section');
+            
+            // Activar navegación
+            const navBtn = document.querySelector('[data-section="ingresar-section"]');
+            if (navBtn) {
+                document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                navBtn.classList.add('active');
+            }
+            
+            // Actualizar datos
+            updateStats();
+            renderClientsList();
+        }, 500);
+    }
+    
+    console.log('✅ Aplicación inicializada');
 }
 
 function setupNavigation() {
@@ -111,16 +175,26 @@ async function handleLogin() {
         
         // Verificar contraseña - usando la estructura de tu tabla
         if (data.password_hash === btoa(password)) {
-            user = { 
-                id: data.id, 
-                username: data.username
-            };
-            sessionStorage.setItem('nexus_user', JSON.stringify(user));
-            showApp();
-            showMessage(`Bienvenido ${data.username}`, 'success');
-        } else {
-            showMessage('Contraseña incorrecta', 'error');
-        }
+    user = { 
+        id: data.id, 
+        username: data.username
+    };
+    sessionStorage.setItem('nexus_user', JSON.stringify(user));
+    
+    // Forzar una reinicialización completa
+    showApp();
+    
+    // Esperar un frame y luego inicializar
+    setTimeout(() => {
+        showSection('ingresar-section');
+        updateStats();
+        renderClientsList();
+        showMessage(`Bienvenido ${data.username}`, 'success');
+    }, 100);
+    
+    } else {
+    showMessage('Contraseña incorrecta', 'error');
+    }
     } catch (error) {
         console.error('Login error:', error);
         showMessage('Error al iniciar sesión', 'error');
@@ -482,16 +556,34 @@ async function loadFromCloud() {
 
 // UI FUNCTIONS
 function showSection(sectionId) {
+    console.log(`🔧 Mostrando sección: ${sectionId}`); // Debug
+    
+    // Ocultar todas las secciones
     document.querySelectorAll('.content-section').forEach(section => {
+        section.style.display = 'none';
         section.classList.remove('active');
     });
     
-    $(sectionId).classList.add('active');
+    // Mostrar la sección seleccionada
+    const targetSection = $(sectionId);
+    if (targetSection) {
+        targetSection.style.display = 'block';
+        targetSection.classList.add('active');
+        
+        // Forzar reflow para asegurar la animación
+        targetSection.offsetHeight;
+        
+        console.log(`✅ Sección ${sectionId} mostrada`); // Debug
+    } else {
+        console.error(`❌ Sección no encontrada: ${sectionId}`);
+    }
     
+    // Detener cámara si no estamos en verificar
     if (sectionId !== 'verificar-section') {
         stopCamera();
     }
     
+    // Actualizar UI específica de cada sección
     if (sectionId === 'gestionar-section') {
         updateStats();
         renderClientsList();
@@ -745,3 +837,30 @@ setInterval(() => {
         syncToCloud();
     }
 }, 30000); // Sync every 30 seconds
+
+function debugAppState() {
+    console.log('🔍 DEBUG - Estado de la aplicación:');
+    console.log('Usuario:', user);
+    console.log('App Container display:', $('#app-container').style.display);
+    console.log('Login Screen display:', $('#login-screen').style.display);
+    console.log('Secciones activas:', document.querySelectorAll('.content-section.active').length);
+    console.log('Body visible:', document.body.style.visibility);
+    
+    // Verificar elementos críticos
+    const criticalElements = [
+        '#app-container',
+        '#ingresar-section', 
+        '.main-content',
+        '.bottom-nav'
+    ];
+    
+    criticalElements.forEach(selector => {
+        const el = $(selector);
+        console.log(`${selector}:`, el ? 'ENCONTRADO' : 'NO ENCONTRADO');
+        if (el) {
+            console.log(`  - display: ${el.style.display}`);
+            console.log(`  - visibility: ${el.style.visibility}`);
+            console.log(`  - opacity: ${el.style.opacity}`);
+        }
+    });
+}
