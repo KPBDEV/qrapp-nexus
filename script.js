@@ -714,13 +714,13 @@ async function syncToCloud() {
         const mergedClients = mergeArraysUnique(clients, cloudClients, 'identificacion');
         const mergedUsedCodes = [...new Set([...usedCodes, ...cloudUsedCodes])];
         
-        // Preparar datos para guardar
+        // Preparar datos para guardar - SOLO CAMPOS QUE EXISTEN EN TU TABLA
         const syncData = {
             id: user.id.toString(), // ID ÚNICO por usuario
             clientes: mergedClients,
             codigos_usados: mergedUsedCodes,
-            usuario: user.username,
             ultima_actualizacion: new Date().toISOString()
+            // NO incluir 'usuario' porque no existe en tu tabla
         };
         
         // Guardar en la nube
@@ -1123,8 +1123,19 @@ async function emergencyDataRecovery() {
         localStorage.setItem('nexus_clients', JSON.stringify(clients));
         localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
         
-        // 4. Sincronizar de vuelta a la nube (con ID único de usuario)
-        await syncToCloud();
+        // 4. Sincronizar de vuelta a la nube (SOLO con campos existentes)
+        const syncData = {
+            id: user.id.toString(),
+            clientes: clients,
+            codigos_usados: usedCodes,
+            ultima_actualizacion: new Date().toISOString()
+        };
+        
+        const { error: syncError } = await supabase
+            .from('event_data')
+            .upsert(syncData, { onConflict: 'id' });
+            
+        if (syncError) throw syncError;
         
         updateStats();
         renderClientsList();
@@ -1140,5 +1151,55 @@ async function emergencyDataRecovery() {
     }
 }
 
-// Agrega un botón de emergencia temporal en tu HTML o ejecuta en consola:
-// emergencyDataRecovery()
+// VERIFICAR ESTRUCTURA DE LA TABLA
+async function checkTableStructure() {
+    try {
+        const { data, error } = await supabase
+            .from('event_data')
+            .select('*')
+            .limit(1)
+            .single();
+            
+        if (error) throw error;
+        
+        console.log('🏗️ ESTRUCTURA DE event_data:', Object.keys(data));
+        console.log('📊 DATOS DE EJEMPLO:', data);
+        
+    } catch (error) {
+        console.error('❌ Error al verificar estructura:', error);
+    }
+}
+
+// Ejecuta esto:
+checkTableStructure();
+
+// LIMPIAR Y SINCRONIZAR DESDE CERO
+async function cleanAndResync() {
+    if (!confirm('⚠️ ¿ESTÁS SEGURO? Esto borrará todos los datos locales y empezará desde los datos de la nube.')) return;
+    
+    showLoading(true);
+    
+    try {
+        // 1. Limpiar datos locales
+        clients = [];
+        usedCodes = [];
+        localStorage.removeItem('nexus_clients');
+        localStorage.removeItem('nexus_usedCodes');
+        
+        // 2. Cargar datos frescos desde la nube
+        await loadFromCloud();
+        
+        // 3. Actualizar UI
+        updateStats();
+        renderClientsList();
+        
+        showMessage('Sincronización limpia completada', 'success');
+        console.log('✅ Sincronización limpia. Clientes:', clients.length);
+        
+    } catch (error) {
+        console.error('❌ Error en limpieza:', error);
+        showMessage('Error en sincronización limpia', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
