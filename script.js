@@ -1332,44 +1332,145 @@ async function mergeAllUsersData() {
 
 // Ejecuta esto: mergeAllUsersData()
 
-// DIAGNÓSTICO DEL COMPAÑERO
-async function diagnoseCompanion() {
-    console.log('🔍 DIAGNÓSTICO COMPAÑERO');
+// DIAGNÓSTICO PROFUNDO DE SINCRONIZACIÓN
+async function deepSyncDiagnosis() {
+    console.log('🔍 DIAGNÓSTICO PROFUNDO DE SINCRONIZACIÓN');
     
-    // Ver usuario actual
-    console.log('👤 Usuario actual:', user);
+    // 1. Ver datos locales
+    console.log('📱 DATOS LOCALES:');
+    console.log(`   Clientes: ${clients.length}`);
+    console.log(`   Códigos usados: ${usedCodes.length}`);
+    console.log('   Últimos 3 clientes locales:', clients.slice(-3).map(c => `${c.nombre} - ${c.identificacion}`));
     
-    // Ver datos locales
-    console.log('💾 Clientes locales:', clients.length);
-    console.log('🔑 Códigos usados locales:', usedCodes.length);
-    
-    // Ver todos los datos en la nube
-    const { data: allData, error } = await supabase
+    // 2. Ver TODOS los datos en la nube
+    const { data: allCloudData, error } = await supabase
         .from('event_data')
         .select('*');
-        
+    
     if (error) {
-        console.error('❌ Error al cargar datos:', error);
+        console.error('❌ Error al cargar datos de nube:', error);
         return;
     }
     
-    console.log('🌐 TODOS LOS DATOS EN LA NUBE:');
-    allData.forEach(record => {
-        console.log(`📁 ${record.id}: ${record.clientes?.length || 0} clientes`);
+    console.log('🌐 DATOS EN LA NUBE:');
+    allCloudData.forEach(record => {
+        console.log(`   📁 ${record.id}: ${record.clientes?.length || 0} clientes`);
+        if (record.clientes && record.clientes.length > 0) {
+            console.log(`      Últimos 3:`, record.clientes.slice(-3).map(c => `${c.nombre} - ${c.identificacion}`));
+        }
     });
     
-    // Ver qué ID está usando el compañero
-    const companionId = `user_${user.id}_${user.username}`;
-    console.log(`🔑 El compañero está usando ID: ${companionId}`);
+    // 3. Ver datos específicos de CADA usuario
+    const myId = `user_${user.id}_${user.username}`;
+    console.log(`🔑 MI ID: ${myId}`);
     
-    // Ver datos específicos del compañero
-    const { data: companionData } = await supabase
-        .from('event_data')
-        .select('*')
-        .eq('id', companionId)
-        .single();
-        
-    console.log(`📊 Datos del compañero (${companionId}):`, companionData?.clientes?.length || 0, 'clientes');
+    const myData = allCloudData.find(r => r.id === myId);
+    console.log(`📊 MIS DATOS EN NUBE: ${myData?.clientes?.length || 0} clientes`);
+    
+    // 4. Contar clientes ÚNICOS en toda la nube
+    let allUniqueClients = [];
+    allCloudData.forEach(record => {
+        if (record.clientes) {
+            allUniqueClients = mergeArraysUnique(allUniqueClients, record.clientes, 'identificacion');
+        }
+    });
+    
+    console.log(`🎯 CLIENTES ÚNICOS EN TODA LA NUBE: ${allUniqueClients.length}`);
+    console.log('   Últimos 3 únicos:', allUniqueClients.slice(-3).map(c => `${c.nombre} - ${c.identificacion}`));
+    
+    // 5. Comparar con datos locales
+    const localUniqueCount = clients.length;
+    const cloudUniqueCount = allUniqueClients.length;
+    
+    console.log(`⚖️ COMPARACIÓN: Local ${localUniqueCount} vs Nube ${cloudUniqueCount}`);
+    
+    if (localUniqueCount !== cloudUniqueCount) {
+        console.log('❌ ¡INCONSISTENCIA DETECTADA!');
+        console.log('   Los datos locales no coinciden con los datos únicos de la nube');
+    } else {
+        console.log('✅ Los datos están consistentes');
+    }
 }
 
-// El compañero ejecuta: diagnoseCompanion()
+// Ejecuta en AMBOS: deepSyncDiagnosis()
+
+// SOLUCIÓN RADICAL - FORZAR CONSISTENCIA
+async function forceConsistency() {
+    if (!confirm('⚠️ ¿ESTÁS SEGURO? Esto sobrescribirá todos los datos con la versión más completa de la nube.')) return;
+    
+    console.log('🔄 FORZANDO CONSISTENCIA...');
+    showLoading(true);
+    
+    try {
+        // 1. Cargar TODOS los datos de la nube
+        const { data: allCloudData, error } = await supabase
+            .from('event_data')
+            .select('*');
+        
+        if (error) throw error;
+        
+        // 2. Encontrar el registro con MÁS clientes
+        let maxClientsRecord = allCloudData[0];
+        allCloudData.forEach(record => {
+            if (record.clientes && record.clientes.length > (maxClientsRecord.clientes?.length || 0)) {
+                maxClientsRecord = record;
+            }
+        });
+        
+        console.log(`📈 Registro con más clientes: ${maxClientsRecord.id} con ${maxClientsRecord.clientes?.length || 0} clientes`);
+        
+        // 3. Fusionar TODOS los clientes de TODOS los registros
+        let allClients = [];
+        let allUsedCodes = [];
+        
+        allCloudData.forEach(record => {
+            if (record.clientes) {
+                allClients = mergeArraysUnique(allClients, record.clientes, 'identificacion');
+            }
+            if (record.codigos_usados) {
+                allUsedCodes = [...new Set([...allUsedCodes, ...record.codigos_usados])];
+            }
+        });
+        
+        console.log(`🎯 Después de fusión completa: ${allClients.length} clientes únicos`);
+        
+        // 4. ACTUALIZAR TODOS los registros con los mismos datos COMPLETOS
+        const updatePromises = allCloudData.map(record => {
+            const updateData = {
+                id: record.id,
+                clientes: allClients, // MISMO dato completo para todos
+                codigos_usados: allUsedCodes, // MISMO dato completo para todos
+                ultima_actualizacion: new Date().toISOString()
+            };
+            
+            return supabase
+                .from('event_data')
+                .upsert(updateData, { onConflict: 'id' });
+        });
+        
+        // Esperar a que TODAS las actualizaciones terminen
+        await Promise.all(updatePromises);
+        
+        // 5. Actualizar datos locales
+        clients = allClients;
+        usedCodes = allUsedCodes;
+        localStorage.setItem('nexus_clients', JSON.stringify(clients));
+        localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
+        
+        // 6. Actualizar UI
+        updateStats();
+        renderClientsList();
+        
+        console.log('✅ CONSISTENCIA FORZADA EXITOSA');
+        console.log(`   Todos los registros ahora tienen: ${allClients.length} clientes`);
+        showMessage(`¡Consistencia forzada! Todos tienen ${allClients.length} clientes`, 'success');
+        
+    } catch (error) {
+        console.error('❌ Error en consistencia forzada:', error);
+        showMessage('Error en consistencia forzada', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Ejecuta en AMBOS: forceConsistency()
