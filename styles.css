@@ -35,6 +35,7 @@ body {
 /* PANTALLAS PRINCIPALES - CORREGIDO */
 .screen {
     min-height: 100vh;
+    position: relative;
 }
 
 #login-screen {
@@ -43,17 +44,30 @@ body {
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    position: relative;
+    z-index: 1000;
 }
 
 #app-container {
     display: none; /* Inicialmente oculta */
     min-height: 100vh;
     background: var(--dark);
+    position: relative;
+}
+
+/* CORRECCIÓN CRÍTICA: Asegurar que la app esté completamente oculta cuando no debe mostrarse */
+#login-screen:not(.hidden) ~ #app-container,
+#login-screen:not([style*="display: none"]) ~ #app-container {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
 }
 
 /* UTILIDADES */
 .hidden { 
     display: none !important; 
+    visibility: hidden !important;
+    opacity: 0 !important;
 }
 
 .container {
@@ -208,9 +222,18 @@ body {
     text-align: center;
 }
 
-/* APP LAYOUT */
+/* APP LAYOUT - CORREGIDO */
 #app-container {
     padding-bottom: 80px;
+    display: none; /* Siempre oculto por defecto */
+}
+
+#app-container:not(.hidden) {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    background: var(--dark) !important;
+    min-height: 100vh !important;
 }
 
 .app-header {
@@ -292,11 +315,18 @@ body {
     font-weight: 500;
 }
 
-/* CONTENIDO PRINCIPAL */
+/* CONTENIDO PRINCIPAL - CORREGIDO */
 .main-content {
     max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
+    display: none; /* Oculto por defecto */
+}
+
+#app-container:not(.hidden) .main-content {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }
 
 .content-section {
@@ -714,106 +744,51 @@ body {
     border-radius: 3px;
 }
 
-/* ESTILOS DE EMERGENCIA - FALLBACK */
-#app-container {
-    opacity: 1 !important;
-    visibility: visible !important;
-    min-height: 100vh;
-    background: var(--dark) !important;
-}
+/* ============================================= */
+/* CORRECCIONES CRÍTICAS DE VISIBILIDAD */
+/* ============================================= */
 
-.content-section {
-    display: none;
-}
-
-.content-section.active {
-    display: block !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-/* Debug visual */
-.debug-border {
-    border: 2px solid red !important;
-}
-
-/* Asegurar que el contenido sea visible */
-.main-content {
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-/* Forzar visibilidad en caso de problemas */
-body {
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-/* Forzar visibilidad de elementos críticos */
-#app-container {
-    opacity: 1 !important;
-    visibility: visible !important;
-    display: block !important;
-}
-
-.content-section {
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-.content-section.active {
-    display: block !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-.main-content {
-    opacity: 1 !important;
-    visibility: visible !important;
-    display: block !important;
-}
-
-.bottom-nav {
-    opacity: 1 !important;
-    visibility: visible !important;
+/* Asegurar que cuando el login esté visible, la app esté oculta */
+#login-screen:not(.hidden) {
     display: flex !important;
 }
 
-.nav-btn {
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-/* Asegurar que el body sea visible */
-body {
-    opacity: 1 !important;
-    visibility: visible !important;
-    background: var(--dark) !important;
-}
-
-/* Remover cualquier hidden que esté bloqueando */
-.screen:not(.hidden) {
-    display: flex !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-
-.screen.hidden {
+#login-screen:not(.hidden) ~ #app-container {
     display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
 }
 
-/* Forzar display block en secciones activas */
-#ingresar-section.active,
-#verificar-section.active, 
-#gestionar-section.active {
+/* Asegurar que cuando la app esté visible, el login esté oculto */
+#app-container:not(.hidden) {
     display: block !important;
     opacity: 1 !important;
     visibility: visible !important;
-    position: relative !important;
-    z-index: 1 !important;
+    background: var(--dark) !important;
+    min-height: 100vh !important;
 }
 
-/* Debug visual temporal */
-.debug-visible {
-    border: 2px solid #00ff00 !important;
+#app-container:not(.hidden) ~ #login-screen {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Forzar visibilidad del contenido principal cuando la app esté activa */
+#app-container:not(.hidden) .main-content {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Forzar visibilidad de las secciones activas */
+#app-container:not(.hidden) .content-section.active {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Asegurar que el body tenga siempre el fondo correcto */
+body {
+    background: var(--dark) !important;
 }
