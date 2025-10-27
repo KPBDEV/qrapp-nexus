@@ -13,8 +13,13 @@ let scanAnimation = null;
 // UTILITY FUNCTIONS CORREGIDAS
 function $(selector) {
     const element = document.querySelector(selector);
-    if (!element && !selector.includes('sync-status')) {
+    if (!element) {
         console.error(`❌ Elemento no encontrado: ${selector}`);
+        
+        // Debug: mostrar todos los elementos disponibles
+        if (selector.includes('form')) {
+            console.log('📋 Formularios disponibles:', document.querySelectorAll('[id*="form"]'));
+        }
     }
     return element;
 }
@@ -683,12 +688,32 @@ async function loadFromCloud() {
 
 // UI FUNCTIONS
 function showForm(formType) {
-    ['login-form', 'register-form', 'recover-form'].forEach(form => {
-        $(form).classList.add('hidden');
+    console.log(`🔧 Mostrando formulario: ${formType}`);
+    
+    const forms = ['login-form', 'register-form', 'recover-form'];
+    
+    forms.forEach(formId => {
+        const formElement = document.getElementById(formId);
+        if (formElement) {
+            if (formId === `${formType}-form`) {
+                formElement.classList.remove('hidden');
+                console.log(`✅ Mostrando: ${formId}`);
+            } else {
+                formElement.classList.add('hidden');
+                console.log(`❌ Ocultando: ${formId}`);
+            }
+        } else {
+            console.error(`❌ Formulario no encontrado: ${formId}`);
+        }
     });
     
-    $(`${formType}-form`).classList.remove('hidden');
-    $('#login-message').classList.add('hidden');
+    // Ocultar mensajes
+    const messageElement = document.getElementById('login-message');
+    if (messageElement) {
+        messageElement.classList.add('hidden');
+    } else {
+        console.error('❌ Elemento login-message no encontrado');
+    }
 }
 
 function updateStats() {
@@ -921,3 +946,29 @@ setInterval(() => {
         syncToCloud();
     }
 }, 30000);
+
+// Función de diagnóstico de formularios - temporal
+function diagnoseForms() {
+    console.log('🔍 DIAGNÓSTICO DE FORMULARIOS:');
+    
+    const forms = ['login-form', 'register-form', 'recover-form', 'login-message'];
+    
+    forms.forEach(id => {
+        const element = document.getElementById(id);
+        console.log(`${id}:`, element ? 'ENCONTRADO' : 'NO ENCONTRADO');
+        if (element) {
+            console.log(`  - classList:`, element.classList);
+            console.log(`  - display:`, element.style.display);
+        }
+    });
+}
+
+// Llámala después del DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    // ... tu código existente
+    
+    // Diagnóstico de formularios
+    setTimeout(() => {
+        diagnoseForms();
+    }, 500);
+});
