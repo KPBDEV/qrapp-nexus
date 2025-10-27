@@ -1259,3 +1259,117 @@ async function showAllCloudData() {
 }
 
 // Ejecuta: showAllCloudData()
+
+// FUSIÓN COMPLETA DE TODOS LOS USUARIOS
+async function mergeAllUsersData() {
+    console.log('🔄 INICIANDO FUSIÓN COMPLETA DE DATOS');
+    showLoading(true);
+    
+    try {
+        // 1. Cargar TODOS los datos de la tabla
+        const { data: allData, error } = await supabase
+            .from('event_data')
+            .select('*');
+            
+        if (error) throw error;
+        
+        console.log('📊 Registros encontrados:', allData.length);
+        
+        // 2. Fusionar TODOS los clientes de TODOS los registros
+        let allClients = [];
+        let allUsedCodes = [];
+        
+        allData.forEach(record => {
+            console.log(`👤 Registro: ${record.id} - ${record.clientes?.length || 0} clientes`);
+            
+            if (record.clientes && record.clientes.length > 0) {
+                allClients = mergeArraysUnique(allClients, record.clientes, 'identificacion');
+            }
+            if (record.codigos_usados && record.codigos_usados.length > 0) {
+                allUsedCodes = [...new Set([...allUsedCodes, ...record.codigos_usados])];
+            }
+        });
+        
+        console.log(`🎯 Después de fusión: ${allClients.length} clientes únicos`);
+        
+        // 3. Actualizar datos locales
+        clients = allClients;
+        usedCodes = allUsedCodes;
+        localStorage.setItem('nexus_clients', JSON.stringify(clients));
+        localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
+        
+        // 4. ACTUALIZAR TODOS LOS REGISTROS EN LA NUBE con los mismos datos
+        const updatePromises = allData.map(record => {
+            const updateData = {
+                id: record.id,
+                clientes: allClients, // Mismos datos para todos
+                codigos_usados: allUsedCodes, // Mismos datos para todos
+                ultima_actualizacion: new Date().toISOString()
+            };
+            
+            return supabase
+                .from('event_data')
+                .upsert(updateData, { onConflict: 'id' });
+        });
+        
+        // Esperar a que todas las actualizaciones terminen
+        await Promise.all(updatePromises);
+        
+        // 5. Actualizar UI
+        updateStats();
+        renderClientsList();
+        
+        console.log('✅ FUSIÓN COMPLETA EXITOSA. Clientes totales:', clients.length);
+        showMessage(`¡Fusión completa! ${clients.length} clientes sincronizados`, 'success');
+        
+    } catch (error) {
+        console.error('❌ Error en fusión:', error);
+        showMessage('Error en fusión de datos', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Ejecuta esto: mergeAllUsersData()
+
+// DIAGNÓSTICO DEL COMPAÑERO
+async function diagnoseCompanion() {
+    console.log('🔍 DIAGNÓSTICO COMPAÑERO');
+    
+    // Ver usuario actual
+    console.log('👤 Usuario actual:', user);
+    
+    // Ver datos locales
+    console.log('💾 Clientes locales:', clients.length);
+    console.log('🔑 Códigos usados locales:', usedCodes.length);
+    
+    // Ver todos los datos en la nube
+    const { data: allData, error } = await supabase
+        .from('event_data')
+        .select('*');
+        
+    if (error) {
+        console.error('❌ Error al cargar datos:', error);
+        return;
+    }
+    
+    console.log('🌐 TODOS LOS DATOS EN LA NUBE:');
+    allData.forEach(record => {
+        console.log(`📁 ${record.id}: ${record.clientes?.length || 0} clientes`);
+    });
+    
+    // Ver qué ID está usando el compañero
+    const companionId = `user_${user.id}_${user.username}`;
+    console.log(`🔑 El compañero está usando ID: ${companionId}`);
+    
+    // Ver datos específicos del compañero
+    const { data: companionData } = await supabase
+        .from('event_data')
+        .select('*')
+        .eq('id', companionId)
+        .single();
+        
+    console.log(`📊 Datos del compañero (${companionId}):`, companionData?.clientes?.length || 0, 'clientes');
+}
+
+// El compañero ejecuta: diagnoseCompanion()
