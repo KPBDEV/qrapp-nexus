@@ -103,6 +103,7 @@ body {
     border-radius: var(--radius);
     box-shadow: var(--shadow);
     border: 1px solid var(--border);
+    display: grid;
 }
 
 .form-title {
@@ -458,6 +459,7 @@ body {
     display: flex;
     gap: 10px;
     margin-bottom: 25px;
+    justify-content: center;
 }
 
 .manual-verify {
@@ -634,6 +636,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    justify-content: center;
 }
 
 /* SINCRONIZACIÓN */
