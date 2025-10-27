@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
+
 <body>
     <!-- LOGIN -->
     <div id="login-screen" class="screen">
@@ -232,5 +233,68 @@
     </div>
 
     <script src="script.js"></script>
+    <script>
+// SCRIPT DE EMERGENCIA VISUAL
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🎨 Aplicando correcciones visuales...');
+    
+    // Forzar estilos críticos
+    const criticalStyles = `
+        #app-container {
+            opacity: 1 !important;
+            visibility: visible !important;
+            display: block !important;
+            background: #0f172a !important;
+        }
+        .main-content {
+            opacity: 1 !important;
+            visibility: visible !important;
+            display: block !important;
+        }
+        .content-section.active {
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+        body {
+            opacity: 1 !important;
+            visibility: visible !important;
+            background: #0f172a !important;
+        }
+    `;
+    
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = criticalStyles;
+    document.head.appendChild(styleSheet);
+    
+    // Forzar visibilidad después del login
+    const originalShowApp = window.showApp;
+    window.showApp = function() {
+        originalShowApp();
+        
+        setTimeout(() => {
+            console.log('🎨 Forzando visibilidad post-login...');
+            document.getElementById('app-container').style.cssText = `
+                display: block !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+                background: #0f172a !important;
+            `;
+            
+            document.querySelector('.main-content').style.cssText = `
+                display: block !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+            `;
+            
+            document.getElementById('ingresar-section').style.cssText = `
+                display: block !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+            `;
+        }, 100);
+    };
+});
+</script>
 </body>
 </html>

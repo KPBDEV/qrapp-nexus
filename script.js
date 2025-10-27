@@ -106,14 +106,36 @@ function showApp() {
     const loginScreen = document.getElementById('login-screen');
     if (loginScreen) {
         loginScreen.style.display = 'none';
+        loginScreen.classList.add('hidden');
     }
     
-    // Mostrar app
+    // Mostrar app con estilos forzados
     const appContainer = document.getElementById('app-container');
     if (appContainer) {
         appContainer.style.display = 'block';
         appContainer.style.visibility = 'visible';
         appContainer.style.opacity = '1';
+        appContainer.classList.remove('hidden');
+        
+        // Forzar estilos críticos
+        appContainer.style.cssText = `
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+            background: var(--dark) !important;
+            position: relative !important;
+            z-index: 100 !important;
+        `;
+    }
+    
+    // Forzar visibilidad del contenido principal
+    const mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+        mainContent.style.cssText = `
+            display: block !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        `;
     }
     
     // Actualizar bienvenida
@@ -122,7 +144,7 @@ function showApp() {
         welcomeElement.textContent = `Hola, ${user.username}`;
     }
     
-    // Mostrar sección principal
+    // Mostrar sección principal con estilos forzados
     showSection('ingresar-section');
     
     // Activar navegación
@@ -135,6 +157,12 @@ function showApp() {
         
         // Cargar datos
         loadFromCloud();
+        
+        // Forzar re-render
+        setTimeout(() => {
+            document.body.style.display = 'block';
+            document.body.offsetHeight; // Trigger reflow
+        }, 50);
     }, 100);
     
     console.log('✅ Aplicación mostrada correctamente');
