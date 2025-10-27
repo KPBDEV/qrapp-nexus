@@ -695,40 +695,41 @@ async function syncToCloud() {
     showSyncStatus('Sincronizando...', 'syncing');
     
     try {
-        // ID ÚNICO por usuario - combinación de user.id y username
         const userUniqueId = `user_${user.id}_${user.username}`;
         
-        console.log(`🔑 Sincronizando con ID único: ${userUniqueId}`);
+        console.log(`🔑 Sincronizando: ${userUniqueId}`);
         
-        // PRIMERO: Cargar datos actuales de ESTE usuario específico
-        const { data: existingData, error: fetchError } = await supabase
+        // PRIMERO: Cargar y fusionar datos de TODOS los usuarios
+        const { data: allCloudData, error: fetchError } = await supabase
             .from('event_data')
-            .select('*')
-            .eq('id', userUniqueId) // ID único por usuario
-            .single();
+            .select('*');
             
         if (fetchError && fetchError.code !== 'PGRST116') {
             throw fetchError;
         }
         
-        // Combinar datos: clientes y códigos usados
-        let userClients = existingData?.clientes || [];
-        let userUsedCodes = existingData?.codigos_usados || [];
+        // Fusionar datos locales con TODOS los datos de la nube
+        let mergedClients = [...clients];
+        let mergedUsedCodes = [...usedCodes];
         
-        console.log(`📊 Datos del usuario en nube: ${userClients.length} clientes`);
-        console.log(`📱 Datos locales: ${clients.length} clientes`);
+        if (allCloudData && allCloudData.length > 0) {
+            allCloudData.forEach(record => {
+                if (record.clientes) {
+                    mergedClients = mergeArraysUnique(mergedClients, record.clientes, 'identificacion');
+                }
+                if (record.codigos_usados) {
+                    mergedUsedCodes = [...new Set([...mergedUsedCodes, ...record.codigos_usados])];
+                }
+            });
+        }
         
-        // Fusionar datos locales con datos de la nube (evitar duplicados)
-        const mergedClients = mergeArraysUnique(clients, userClients, 'identificacion');
-        const mergedUsedCodes = [...new Set([...usedCodes, ...userUsedCodes])];
-        
-        console.log(`🔄 Después de fusionar: ${mergedClients.length} clientes`);
+        console.log(`🔄 Después de fusión completa: ${mergedClients.length} clientes`);
         
         // Preparar datos para guardar
         const syncData = {
-            id: userUniqueId, // ID ÚNICO por usuario
-            clientes: mergedClients,
-            codigos_usados: mergedUsedCodes,
+            id: userUniqueId,
+            clientes: mergedClients, // Datos fusionados completos
+            codigos_usados: mergedUsedCodes, // Datos fusionados completos
             ultima_actualizacion: new Date().toISOString()
         };
         
@@ -741,7 +742,7 @@ async function syncToCloud() {
             
         if (error) throw error;
         
-        // Actualizar datos locales con la fusión
+        // Actualizar datos locales con la fusión completa
         clients = mergedClients;
         usedCodes = mergedUsedCodes;
         localStorage.setItem('nexus_clients', JSON.stringify(clients));
@@ -763,45 +764,56 @@ async function loadFromCloud() {
     if (!user) return;
     
     try {
-        // ID ÚNICO por usuario
-        const userUniqueId = `user_${user.id}_${user.username}`;
+        console.log('🔍 Cargando y fusionando datos de TODOS los usuarios...');
         
-        console.log(`🔍 Cargando datos para: ${userUniqueId}`);
-        
-        // Cargar datos específicos del usuario actual
-        const { data, error } = await supabase
+        // 1. Cargar TODOS los datos de la tabla (todos los usuarios)
+        const { data: allCloudData, error } = await supabase
             .from('event_data')
-            .select('*')
-            .eq('id', userUniqueId) // ID único por usuario
-            .single();
+            .select('*');
             
         if (error) {
             if (error.code === 'PGRST116') {
-                console.log('📭 No hay datos en la nube para este usuario');
+                console.log('📭 No hay datos en la nube');
                 return;
             }
             throw error;
         }
         
-        if (data) {
-            console.log(`📥 Datos cargados: ${data.clientes?.length || 0} clientes`);
-            
-            // Fusionar datos locales con datos de la nube
-            if (data.clientes && data.clientes.length > 0) {
-                clients = mergeArraysUnique(clients, data.clientes, 'identificacion');
-            }
-            
-            if (data.codigos_usados && data.codigos_usados.length > 0) {
-                usedCodes = [...new Set([...usedCodes, ...data.codigos_usados])];
-            }
-            
-            // Guardar localmente
-            localStorage.setItem('nexus_clients', JSON.stringify(clients));
-            localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
-            
-            updateStats();
-            console.log(`✅ Datos cargados. Clientes totales: ${clients.length}`);
+        if (!allCloudData || allCloudData.length === 0) {
+            console.log('📭 No se encontraron datos en la nube');
+            return;
         }
+        
+        console.log(`📊 Se encontraron ${allCloudData.length} registros en la nube`);
+        
+        // 2. Fusionar TODOS los clientes de TODOS los registros
+        let allClients = [...clients]; // Empezar con datos locales
+        let allUsedCodes = [...usedCodes]; // Empezar con datos locales
+        
+        allCloudData.forEach(record => {
+            console.log(`👤 Fusionando: ${record.id} - ${record.clientes?.length || 0} clientes`);
+            
+            if (record.clientes && record.clientes.length > 0) {
+                allClients = mergeArraysUnique(allClients, record.clientes, 'identificacion');
+            }
+            if (record.codigos_usados && record.codigos_usados.length > 0) {
+                allUsedCodes = [...new Set([...allUsedCodes, ...record.codigos_usados])];
+            }
+        });
+        
+        console.log(`🎯 Después de fusión completa: ${allClients.length} clientes únicos`);
+        
+        // 3. Actualizar datos locales con la fusión completa
+        clients = allClients;
+        usedCodes = allUsedCodes;
+        localStorage.setItem('nexus_clients', JSON.stringify(clients));
+        localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
+        
+        // 4. Actualizar UI
+        updateStats();
+        
+        console.log(`✅ Carga completa exitosa. Clientes totales: ${clients.length}`);
+        
     } catch (error) {
         console.error('❌ Load error:', error);
         showMessage('Error al cargar datos', 'error');
