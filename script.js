@@ -695,11 +695,16 @@ async function syncToCloud() {
     showSyncStatus('Sincronizando...', 'syncing');
     
     try {
-        // PRIMERO: Cargar datos actuales de la nube para evitar conflictos
+        // ID ÚNICO por usuario - combinación de user.id y username
+        const userUniqueId = `user_${user.id}_${user.username}`;
+        
+        console.log(`🔑 Sincronizando con ID único: ${userUniqueId}`);
+        
+        // PRIMERO: Cargar datos actuales de ESTE usuario específico
         const { data: existingData, error: fetchError } = await supabase
             .from('event_data')
             .select('*')
-            .eq('id', user.id.toString()) // Usar ID de usuario único
+            .eq('id', userUniqueId) // ID único por usuario
             .single();
             
         if (fetchError && fetchError.code !== 'PGRST116') {
@@ -707,20 +712,24 @@ async function syncToCloud() {
         }
         
         // Combinar datos: clientes y códigos usados
-        let cloudClients = existingData?.clientes || [];
-        let cloudUsedCodes = existingData?.codigos_usados || [];
+        let userClients = existingData?.clientes || [];
+        let userUsedCodes = existingData?.codigos_usados || [];
+        
+        console.log(`📊 Datos del usuario en nube: ${userClients.length} clientes`);
+        console.log(`📱 Datos locales: ${clients.length} clientes`);
         
         // Fusionar datos locales con datos de la nube (evitar duplicados)
-        const mergedClients = mergeArraysUnique(clients, cloudClients, 'identificacion');
-        const mergedUsedCodes = [...new Set([...usedCodes, ...cloudUsedCodes])];
+        const mergedClients = mergeArraysUnique(clients, userClients, 'identificacion');
+        const mergedUsedCodes = [...new Set([...usedCodes, ...userUsedCodes])];
         
-        // Preparar datos para guardar - SOLO CAMPOS QUE EXISTEN EN TU TABLA
+        console.log(`🔄 Después de fusionar: ${mergedClients.length} clientes`);
+        
+        // Preparar datos para guardar
         const syncData = {
-            id: user.id.toString(), // ID ÚNICO por usuario
+            id: userUniqueId, // ID ÚNICO por usuario
             clientes: mergedClients,
             codigos_usados: mergedUsedCodes,
             ultima_actualizacion: new Date().toISOString()
-            // NO incluir 'usuario' porque no existe en tu tabla
         };
         
         // Guardar en la nube
@@ -741,7 +750,7 @@ async function syncToCloud() {
         showSyncStatus('Sincronizado ✓', 'success');
         setTimeout(() => hideSyncStatus(), 2000);
         
-        console.log('✅ Sincronización exitosa. Clientes:', clients.length);
+        console.log(`✅ Sincronización exitosa. Clientes: ${clients.length}`);
         
     } catch (error) {
         console.error('❌ Sync error:', error);
@@ -754,32 +763,47 @@ async function loadFromCloud() {
     if (!user) return;
     
     try {
+        // ID ÚNICO por usuario
+        const userUniqueId = `user_${user.id}_${user.username}`;
+        
+        console.log(`🔍 Cargando datos para: ${userUniqueId}`);
+        
+        // Cargar datos específicos del usuario actual
         const { data, error } = await supabase
             .from('event_data')
             .select('*')
-            .eq('id', 'main')
+            .eq('id', userUniqueId) // ID único por usuario
             .single();
             
         if (error) {
             if (error.code === 'PGRST116') {
-                console.log('No hay datos en la nube, empezando fresco');
+                console.log('📭 No hay datos en la nube para este usuario');
                 return;
             }
             throw error;
         }
         
         if (data) {
-            clients = data.clientes || [];
-            usedCodes = data.codigos_usados || [];
+            console.log(`📥 Datos cargados: ${data.clientes?.length || 0} clientes`);
             
+            // Fusionar datos locales con datos de la nube
+            if (data.clientes && data.clientes.length > 0) {
+                clients = mergeArraysUnique(clients, data.clientes, 'identificacion');
+            }
+            
+            if (data.codigos_usados && data.codigos_usados.length > 0) {
+                usedCodes = [...new Set([...usedCodes, ...data.codigos_usados])];
+            }
+            
+            // Guardar localmente
             localStorage.setItem('nexus_clients', JSON.stringify(clients));
             localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
             
             updateStats();
-            console.log('✅ Datos cargados desde la nube');
+            console.log(`✅ Datos cargados. Clientes totales: ${clients.length}`);
         }
     } catch (error) {
-        console.error('Load error:', error);
+        console.error('❌ Load error:', error);
         showMessage('Error al cargar datos', 'error');
     }
 }
@@ -1088,8 +1112,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // FUNCIÓN DE EMERGENCIA - DIAGNÓSTICO Y RECUPERACIÓN
+// FUNCIÓN DE EMERGENCIA - FUSIONAR DATOS DE TODOS LOS USUARIOS
 async function emergencyDataRecovery() {
-    console.log('🆘 INICIANDO RECUPERACIÓN DE EMERGENCIA');
+    console.log('🆘 INICIANDO RECUPERACIÓN COMPLETA');
     showLoading(true);
     
     try {
@@ -1100,22 +1125,26 @@ async function emergencyDataRecovery() {
             
         if (error) throw error;
         
-        console.log('📊 Todos los datos en la nube:', allData);
+        console.log('📊 Todos los registros en la nube:', allData);
         
-        // 2. Fusionar todos los datos de todos los usuarios
+        // 2. Fusionar todos los datos de TODOS los usuarios
         let allClients = [...clients];
         let allUsedCodes = [...usedCodes];
         
         if (allData && allData.length > 0) {
             allData.forEach(userData => {
-                if (userData.clientes) {
+                console.log(`👤 Procesando: ${userData.id} - ${userData.clientes?.length || 0} clientes`);
+                
+                if (userData.clientes && userData.clientes.length > 0) {
                     allClients = mergeArraysUnique(allClients, userData.clientes, 'identificacion');
                 }
-                if (userData.codigos_usados) {
+                if (userData.codigos_usados && userData.codigos_usados.length > 0) {
                     allUsedCodes = [...new Set([...allUsedCodes, ...userData.codigos_usados])];
                 }
             });
         }
+        
+        console.log(`🔄 Después de fusionar todos: ${allClients.length} clientes`);
         
         // 3. Actualizar datos locales
         clients = allClients;
@@ -1123,9 +1152,10 @@ async function emergencyDataRecovery() {
         localStorage.setItem('nexus_clients', JSON.stringify(clients));
         localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
         
-        // 4. Sincronizar de vuelta a la nube (SOLO con campos existentes)
+        // 4. Sincronizar de vuelta a la nube con ID único
+        const userUniqueId = `user_${user.id}_${user.username}`;
         const syncData = {
-            id: user.id.toString(),
+            id: userUniqueId,
             clientes: clients,
             codigos_usados: usedCodes,
             ultima_actualizacion: new Date().toISOString()
@@ -1141,7 +1171,7 @@ async function emergencyDataRecovery() {
         renderClientsList();
         
         console.log('✅ RECUPERACIÓN EXITOSA. Clientes totales:', clients.length);
-        showMessage(`¡Recuperación exitosa! Se recuperaron ${clients.length} clientes`, 'success');
+        showMessage(`¡Recuperación exitosa! Se fusionaron ${clients.length} clientes`, 'success');
         
     } catch (error) {
         console.error('❌ Error en recuperación:', error);
@@ -1203,3 +1233,29 @@ async function cleanAndResync() {
         showLoading(false);
     }
 }
+
+// VER TODOS LOS DATOS EN LA NUBE
+async function showAllCloudData() {
+    try {
+        const { data: allData, error } = await supabase
+            .from('event_data')
+            .select('*');
+            
+        if (error) throw error;
+        
+        console.log('🌐 TODOS LOS DATOS EN LA NUBE:');
+        allData.forEach(record => {
+            console.log(`📁 ${record.id}: ${record.clientes?.length || 0} clientes, ${record.codigos_usados?.length || 0} códigos usados`);
+            if (record.clientes) {
+                record.clientes.forEach(client => {
+                    console.log(`   👤 ${client.nombre} - ${client.identificacion}`);
+                });
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Error al cargar datos:', error);
+    }
+}
+
+// Ejecuta: showAllCloudData()
