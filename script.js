@@ -945,11 +945,40 @@ function renderClientsList(query = '') {
                     <span class="status-badge ${hasUsed ? 'used' : ''}">
                         ${hasUsed ? '✅ Ingresó' : '⏳ Pendiente'}
                     </span>
-                    ${hasUsed ? `<button onclick="authorizeReentry('${client.identificacion}')" class="btn warning small">Autorizar Reingreso</button>` : ''}
+                    <button onclick="showQRForClient('${client.identificacion}', '${client.nombre}')" class="btn primary small">
+                        📱 Ver QR
+                    </button>
+                    ${hasUsed ? `
+                        <button onclick="authorizeReentry('${client.identificacion}')" class="btn warning small">
+                            🔄 Reingreso
+                        </button>
+                    ` : ''}
                 </div>
             </div>
         `;
     }).join('');
+}
+
+// MOSTRAR QR DE CLIENTE EXISTENTE
+function showQRForClient(identification, clientName) {
+    console.log(`📱 Mostrando QR para: ${clientName} - ${identification}`);
+    
+    // Navegar a la sección de registrar
+    showSection('ingresar-section');
+    
+    // Activar navegación
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-section="ingresar-section"]').classList.add('active');
+    
+    // Generar y mostrar el QR en la sección existente
+    generateQR(identification);
+    
+    // Actualizar mensaje
+    $('#qr-message').textContent = `QR de: ${clientName} (${identification})`;
+    $('#qr-message').className = 'qr-message success';
+    
+    // Mostrar mensaje informativo
+    showMessage(`QR mostrado para: ${clientName}`, 'success');
 }
 
 // Función auxiliar para autorizar reingreso desde la lista

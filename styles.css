@@ -795,3 +795,17 @@ body {
 body {
     background: var(--dark) !important;
 }
+
+/* Estilos para botones en lista de clientes */
+.client-actions {
+    margin-top: 15px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.client-actions .btn.small {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+}
