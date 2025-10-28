@@ -1517,51 +1517,82 @@ async function forceConsistency() {
 
 // Ejecuta en AMBOS: forceConsistency()
 
-// DIAGNÓSTICO DE REINGRESOS
-async function diagnoseReentries() {
-    console.log('🔍 DIAGNÓSTICO DE SISTEMA DE REINGRESOS');
+// DIAGNÓSTICO ESPECÍFICO DE REINGRESOS
+async function diagnoseReentryProblem() {
+    console.log('🔍 DIAGNÓSTICO ESPECÍFICO DE REINGRESO');
     
-    console.log('📊 Estado actual:');
-    console.log(`   Total clientes: ${clients.length}`);
+    // 1. Ver estado local
+    console.log('📱 ESTADO LOCAL:');
     console.log(`   Códigos usados: ${usedCodes.length}`);
-    console.log(`   Códigos usados:`, usedCodes);
+    console.log('   Lista:', usedCodes);
     
-    // Verificar sincronización en la nube
+    // 2. Ver estado en la nube de CADA registro
     const { data: allCloudData, error } = await supabase
         .from('event_data')
         .select('*');
         
     if (error) {
-        console.error('❌ Error al cargar datos:', error);
+        console.error('❌ Error:', error);
         return;
     }
     
-    console.log('🌐 Estado en la nube:');
+    console.log('🌐 ESTADO EN LA NUBE:');
     allCloudData.forEach(record => {
-        console.log(`   ${record.id}: ${record.codigos_usados?.length || 0} códigos usados`);
+        console.log(`   ${record.id}:`);
+        console.log(`      Clientes: ${record.clientes?.length || 0}`);
+        console.log(`      Códigos usados: ${record.codigos_usados?.length || 0}`);
         if (record.codigos_usados && record.codigos_usados.length > 0) {
-            console.log(`      Códigos:`, record.codigos_usados);
+            console.log(`      Lista:`, record.codigos_usados);
         }
     });
     
-    // Verificar consistencia
-    const allUsedCodesFromCloud = [];
+    // 3. Verificar si el código 001DM está en algún registro
+    const targetCode = '001DM';
+    console.log(`🎯 BUSCANDO CÓDIGO: ${targetCode}`);
+    
+    let codeFoundInCloud = false;
+    allCloudData.forEach(record => {
+        if (record.codigos_usados && record.codigos_usados.includes(targetCode)) {
+            console.log(`   ✅ Encontrado en: ${record.id}`);
+            codeFoundInCloud = true;
+        }
+    });
+    
+    if (!codeFoundInCloud) {
+        console.log(`   ❌ Código ${targetCode} NO encontrado en la nube`);
+    }
+    
+    // 4. Verificar consistencia
+    const allCloudUsedCodes = [];
     allCloudData.forEach(record => {
         if (record.codigos_usados) {
-            allUsedCodesFromCloud.push(...record.codigos_usados);
+            allCloudUsedCodes.push(...record.codigos_usados);
         }
     });
     
-    const uniqueUsedCodesFromCloud = [...new Set(allUsedCodesFromCloud)];
-    console.log(`🎯 Códigos usados únicos en nube: ${uniqueUsedCodesFromCloud.length}`);
-    console.log('   Códigos:', uniqueUsedCodesFromCloud);
+    const uniqueCloudCodes = [...new Set(allCloudUsedCodes)];
+    console.log(`📊 RESUMEN NUBE: ${uniqueCloudCodes.length} códigos únicos`);
     
     // Comparar con local
-    if (usedCodes.length !== uniqueUsedCodesFromCloud.length) {
-        console.log('❌ INCONSISTENCIA: Los códigos usados locales no coinciden con la nube');
-    } else {
-        console.log('✅ Los códigos usados están consistentes');
+    const localCodesSet = new Set(usedCodes);
+    const cloudCodesSet = new Set(uniqueCloudCodes);
+    
+    console.log(`⚖️ COMPARACIÓN: Local ${usedCodes.length} vs Nube ${uniqueCloudCodes.length}`);
+    
+    // Encontrar diferencias
+    const onlyInLocal = usedCodes.filter(code => !cloudCodesSet.has(code));
+    const onlyInCloud = uniqueCloudCodes.filter(code => !localCodesSet.has(code));
+    
+    if (onlyInLocal.length > 0) {
+        console.log('❌ Códigos solo en local:', onlyInLocal);
+    }
+    if (onlyInCloud.length > 0) {
+        console.log('❌ Códigos solo en nube:', onlyInCloud);
+    }
+    
+    if (onlyInLocal.length === 0 && onlyInCloud.length === 0) {
+        console.log('✅ Los códigos están consistentes');
     }
 }
 
-// Ejecuta: diagnoseReentries()
+// Ejecuta: diagnoseReentryProblem()
