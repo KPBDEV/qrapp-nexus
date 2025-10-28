@@ -619,8 +619,9 @@ async function syncToCloud() {
         const userUniqueId = `user_${user.id}_${user.username}`;
         
         console.log(`🔑 Sincronizando: ${userUniqueId}`);
+        console.log(`📱 ENVIANDO usedCodes:`, usedCodes);
         
-        // PRIMERO cargar todos los datos actuales de la nube
+        // Obtener datos actuales SOLO para fusión de clientes
         const { data: allCloudData, error: fetchError } = await supabase
             .from('event_data')
             .select('*');
@@ -629,50 +630,26 @@ async function syncToCloud() {
             throw fetchError;
         }
         
-        // Encontrar la versión MÁS ACTUALIZADA de los datos
-        let latestClients = [...clients];
-        let latestUsedCodes = [...usedCodes];
-        let latestTimestamp = new Date().getTime();
+        // Fusionar SOLO clientes (no usedCodes)
+        let mergedClients = [...clients];
         
         if (allCloudData && allCloudData.length > 0) {
             allCloudData.forEach(record => {
-                if (record.ultima_actualizacion) {
-                    const recordTime = new Date(record.ultima_actualizacion).getTime();
-                    if (recordTime > latestTimestamp) {
-                        latestTimestamp = recordTime;
-                        latestClients = record.clientes || latestClients;
-                        latestUsedCodes = record.codigos_usados || latestUsedCodes;
-                    }
-                }
-                
-                // Fusionar clientes de todos los registros
                 if (record.clientes) {
-                    latestClients = mergeArraysUnique(latestClients, record.clientes, 'identificacion');
-                }
-                // Fusionar usedCodes de todos los registros  
-                if (record.codigos_usados) {
-                    latestUsedCodes = [...new Set([...latestUsedCodes, ...record.codigos_usados])];
+                    mergedClients = mergeArraysUnique(mergedClients, record.clientes, 'identificacion');
                 }
             });
         }
         
-        console.log(`🔄 Sincronizando datos unificados: ${latestClients.length} clientes, ${latestUsedCodes.length} códigos`);
-        
-        // ACTUALIZAR DATOS LOCALES con la versión más reciente
-        clients = latestClients;
-        usedCodes = latestUsedCodes;
-        localStorage.setItem('nexus_clients', JSON.stringify(clients));
-        localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
-        
-        // PREPARAR datos para guardar (los mismos para todos)
+        // PREPARAR datos para guardar - usedCodes LOCAL se convierte en la VERDAD
         const syncData = {
             id: userUniqueId,
-            clientes: clients,
-            codigos_usados: usedCodes,
+            clientes: mergedClients,
+            codigos_usados: usedCodes, // ✅ ESTOS usedCodes se imponen a todos
             ultima_actualizacion: new Date().toISOString()
         };
         
-        // GUARDAR en la nube
+        // GUARDAR - esto SOBRESCRIBIRÁ usedCodes para todos los usuarios
         const { error } = await supabase
             .from('event_data')
             .upsert(syncData, { 
@@ -681,10 +658,14 @@ async function syncToCloud() {
             
         if (error) throw error;
         
+        // Actualizar localmente
+        clients = mergedClients;
+        localStorage.setItem('nexus_clients', JSON.stringify(clients));
+        
         showSyncStatus('Sincronizado ✓', 'success');
         setTimeout(() => hideSyncStatus(), 2000);
         
-        console.log(`✅ Sincronización exitosa. Clientes: ${clients.length}, Códigos: ${usedCodes.length}`);
+        console.log(`✅ Sincronización exitosa. usedCodes propagados:`, usedCodes);
         
     } catch (error) {
         console.error('❌ Sync error:', error);
@@ -697,7 +678,7 @@ async function loadFromCloud() {
     if (!user) return;
     
     try {
-        console.log('🔍 Cargando datos compartidos de la nube...');
+        console.log('🔍 Cargando datos de la nube...');
         
         const { data: allCloudData, error } = await supabase
             .from('event_data')
@@ -716,43 +697,38 @@ async function loadFromCloud() {
             return;
         }
         
-        console.log(`📊 Se encontraron ${allCloudData.length} registros en la nube`);
-        
-        // Encontrar los datos MÁS RECIENTES
-        let latestClients = [...clients];
-        let latestUsedCodes = [...usedCodes];
+        // Encontrar los usedCodes MÁS RECIENTES
+        let latestUsedCodes = usedCodes;
         let latestTimestamp = 0;
+        let mergedClients = [...clients];
         
         allCloudData.forEach(record => {
-            if (record.ultima_actualizacion) {
-                const recordTime = new Date(record.ultima_actualizacion).getTime();
-                if (recordTime > latestTimestamp) {
-                    latestTimestamp = recordTime;
-                    latestClients = record.clientes || latestClients;
-                    latestUsedCodes = record.codigos_usados || latestUsedCodes;
-                }
+            // Fusionar clientes
+            if (record.clientes) {
+                mergedClients = mergeArraysUnique(mergedClients, record.clientes, 'identificacion');
             }
             
-            // Fusionar todos los datos
-            if (record.clientes) {
-                latestClients = mergeArraysUnique(latestClients, record.clientes, 'identificacion');
-            }
-            if (record.codigos_usados) {
-                latestUsedCodes = [...new Set([...latestUsedCodes, ...record.codigos_usados])];
+            // Encontrar usedCodes más recientes
+            if (record.ultima_actualizacion) {
+                const recordTime = new Date(record.ultima_actualizacion).getTime();
+                if (recordTime > latestTimestamp && record.codigos_usados) {
+                    latestTimestamp = recordTime;
+                    latestUsedCodes = record.codigos_usados;
+                }
             }
         });
         
-        console.log(`🎯 Datos unificados: ${latestClients.length} clientes, ${latestUsedCodes.length} códigos`);
+        console.log(`🔄 UsedCodes más recientes:`, latestUsedCodes);
         
-        // ACTUALIZAR datos locales con los datos unificados
-        clients = latestClients;
+        // ACTUALIZAR con los datos más recientes
+        clients = mergedClients;
         usedCodes = latestUsedCodes;
         localStorage.setItem('nexus_clients', JSON.stringify(clients));
         localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
         
         updateStats();
         
-        console.log(`✅ Carga exitosa. Clientes: ${clients.length}, Códigos usados: ${usedCodes.length}`);
+        console.log(`✅ Carga exitosa. UsedCodes actualizados:`, usedCodes);
         
     } catch (error) {
         console.error('❌ Load error:', error);
@@ -1015,6 +991,19 @@ async function forceSync() {
         showLoading(false);
     }
 }
+
+async function forceConsistency() {
+    const { data: allData } = await supabase.from('event_data').select('*');
+    const updatePromises = allData.map(record => {
+        return supabase.from('event_data').update({
+            codigos_usados: usedCodes, // Tus usedCodes actuales
+            ultima_actualizacion: new Date().toISOString()
+        }).eq('id', record.id);
+    });
+    await Promise.all(updatePromises);
+    console.log('✅ Todos los usuarios actualizados con usedCodes consistentes');
+}
+forceConsistency();
 
 async function clearDatabase() {
     if (!confirm('¿ESTÁS SEGURO? Esto borrará TODOS los datos locales y de la nube.')) {
