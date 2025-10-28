@@ -939,35 +939,65 @@ function renderClientsList(query = '') {
                     <p><strong>ID:</strong> ${client.identificacion}</p>
                     <p><strong>Teléfono:</strong> ${client.telefono}</p>
                     <p><strong>Fecha:</strong> ${new Date(client.fecha).toLocaleString()}</p>
+                    <p><strong>Registrado por:</strong> ${client.creadoPor || 'Sistema'}</p>
                 </div>
                 <div class="client-actions">
                     <span class="status-badge ${hasUsed ? 'used' : ''}">
                         ${hasUsed ? '✅ Ingresó' : '⏳ Pendiente'}
                     </span>
+                    ${hasUsed ? `<button onclick="authorizeReentry('${client.identificacion}')" class="btn warning small">Autorizar Reingreso</button>` : ''}
                 </div>
             </div>
         `;
     }).join('');
 }
 
+// Función auxiliar para autorizar reingreso desde la lista
+async function authorizeReentry(code) {
+    $('#codigo-reingreso').value = code;
+    await handleReentry();
+}
+
+// Función auxiliar para autorizar reingreso desde la lista
+async function authorizeReentry(code) {
+    $('#codigo-reingreso').value = code;
+    await handleReentry();
+}
+
 // REENTRY FUNCTIONALITY
-function handleReentry() {
+async function handleReentry() {
     const code = $('#codigo-reingreso').value.trim();
     if (!code) {
         showMessage('Ingresa un código para autorizar reingreso', 'error');
         return;
     }
     
+    // Verificar que el código existe en los clientes registrados
+    const clientExists = clients.some(client => client.identificacion === code);
+    if (!clientExists) {
+        showMessage('Código no encontrado en clientes registrados', 'error');
+        return;
+    }
+    
     const index = usedCodes.indexOf(code);
     if (index > -1) {
+        // Remover de códigos usados
         usedCodes.splice(index, 1);
         localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
-        syncToCloud();
+        
+        console.log(`🔄 Reingreso autorizado para código: ${code}`);
+        
+        // SINCRONIZACIÓN INMEDIATA con la nube
+        await syncToCloud();
+        
         updateStats();
-        showMessage('Reingreso autorizado exitosamente', 'success');
+        renderClientsList();
+        
+        showMessage(`✅ Reingreso autorizado exitosamente para ${code}`, 'success');
         $('#codigo-reingreso').value = '';
+        
     } else {
-        showMessage('Código no encontrado en ingresos', 'error');
+        showMessage('❌ Este código no está marcado como usado', 'error');
     }
 }
 
@@ -1486,3 +1516,52 @@ async function forceConsistency() {
 }
 
 // Ejecuta en AMBOS: forceConsistency()
+
+// DIAGNÓSTICO DE REINGRESOS
+async function diagnoseReentries() {
+    console.log('🔍 DIAGNÓSTICO DE SISTEMA DE REINGRESOS');
+    
+    console.log('📊 Estado actual:');
+    console.log(`   Total clientes: ${clients.length}`);
+    console.log(`   Códigos usados: ${usedCodes.length}`);
+    console.log(`   Códigos usados:`, usedCodes);
+    
+    // Verificar sincronización en la nube
+    const { data: allCloudData, error } = await supabase
+        .from('event_data')
+        .select('*');
+        
+    if (error) {
+        console.error('❌ Error al cargar datos:', error);
+        return;
+    }
+    
+    console.log('🌐 Estado en la nube:');
+    allCloudData.forEach(record => {
+        console.log(`   ${record.id}: ${record.codigos_usados?.length || 0} códigos usados`);
+        if (record.codigos_usados && record.codigos_usados.length > 0) {
+            console.log(`      Códigos:`, record.codigos_usados);
+        }
+    });
+    
+    // Verificar consistencia
+    const allUsedCodesFromCloud = [];
+    allCloudData.forEach(record => {
+        if (record.codigos_usados) {
+            allUsedCodesFromCloud.push(...record.codigos_usados);
+        }
+    });
+    
+    const uniqueUsedCodesFromCloud = [...new Set(allUsedCodesFromCloud)];
+    console.log(`🎯 Códigos usados únicos en nube: ${uniqueUsedCodesFromCloud.length}`);
+    console.log('   Códigos:', uniqueUsedCodesFromCloud);
+    
+    // Comparar con local
+    if (usedCodes.length !== uniqueUsedCodesFromCloud.length) {
+        console.log('❌ INCONSISTENCIA: Los códigos usados locales no coinciden con la nube');
+    } else {
+        console.log('✅ Los códigos usados están consistentes');
+    }
+}
+
+// Ejecuta: diagnoseReentries()
