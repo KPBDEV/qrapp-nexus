@@ -1001,32 +1001,79 @@ async function handleReentry() {
         return;
     }
     
-    // Verificar que el código existe en los clientes registrados
+    console.log(`🔄 INICIANDO REINGRESO PARA: ${code}`);
+    
+    // 1. Verificar que el código existe en clientes
     const clientExists = clients.some(client => client.identificacion === code);
     if (!clientExists) {
-        showMessage('Código no encontrado en clientes registrados', 'error');
+        showMessage('❌ Código no encontrado en clientes registrados', 'error');
         return;
     }
     
-    const index = usedCodes.indexOf(code);
-    if (index > -1) {
-        // Remover de códigos usados
-        usedCodes.splice(index, 1);
+    // 2. Verificar que el código está marcado como usado
+    const currentIndex = usedCodes.indexOf(code);
+    console.log(`📊 Verificación: usedCodes incluye "${code}": ${currentIndex !== -1}`);
+    
+    if (currentIndex === -1) {
+        showMessage('❌ Este código no está marcado como usado', 'error');
+        return;
+    }
+    
+    // 3. Mostrar loading
+    showLoading(true);
+    showSyncStatus('Autorizando reingreso...', 'syncing');
+    
+    try {
+        // 4. DEBUG: Estado antes
+        console.log('🔍 ANTES DE REINGRESO:');
+        console.log(`   usedCodes:`, usedCodes);
+        console.log(`   Índice de ${code}:`, currentIndex);
+        
+        // 5. Remover de usedCodes LOCALMENTE
+        usedCodes.splice(currentIndex, 1);
         localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
         
-        console.log(`🔄 Reingreso autorizado para código: ${code}`);
+        console.log('✅ DESPUÉS DE REMOVER LOCAL:');
+        console.log(`   usedCodes:`, usedCodes);
+        console.log(`   usedCodes incluye "${code}":`, usedCodes.includes(code));
         
-        // SINCRONIZACIÓN INMEDIATA con la nube
+        // 6. SINCRONIZACIÓN INMEDIATA
+        console.log('☁️ Sincronizando con nube...');
         await syncToCloud();
         
+        // 7. VERIFICACIÓN EXTRA - Forzar recarga desde nube
+        console.log('🔍 Verificando sincronización...');
+        await loadFromCloud();
+        
+        // 8. Verificación final
+        const finalCheck = usedCodes.includes(code);
+        console.log(`🎯 VERIFICACIÓN FINAL: usedCodes incluye "${code}": ${finalCheck}`);
+        
+        if (finalCheck) {
+            console.error('❌ FALLA CRÍTICA: El código sigue en usedCodes después de todo el proceso');
+            throw new Error('El reingreso no se completó correctamente');
+        }
+        
+        // 9. ACTUALIZAR UI
         updateStats();
         renderClientsList();
+        
+        // 10. MOSTRAR ÉXITO
+        showSyncStatus('Reingreso autorizado ✓', 'success');
+        setTimeout(() => hideSyncStatus(), 3000);
         
         showMessage(`✅ Reingreso autorizado exitosamente para ${code}`, 'success');
         $('#codigo-reingreso').value = '';
         
-    } else {
-        showMessage('❌ Este código no está marcado como usado', 'error');
+        console.log(`🎉 REINGRESO COMPLETADO EXITOSAMENTE PARA: ${code}`);
+        
+    } catch (error) {
+        console.error('❌ ERROR EN REINGRESO:', error);
+        showSyncStatus('Error en reingreso', 'error');
+        setTimeout(() => hideSyncStatus(), 3000);
+        showMessage(`Error al autorizar reingreso: ${error.message}`, 'error');
+    } finally {
+        showLoading(false);
     }
 }
 
@@ -1625,3 +1672,85 @@ async function diagnoseReentryProblem() {
 }
 
 // Ejecuta: diagnoseReentryProblem()
+
+// PRUEBA CONTROLADA DE REINGRESO
+async function testReentryControlled() {
+    const testCode = '001DM'; // Usamos un código que sabemos que existe
+    
+    console.log('🧪 PRUEBA CONTROLADA DE REINGRESO');
+    console.log(`🔍 Código de prueba: ${testCode}`);
+    
+    // 1. Estado inicial
+    console.log('📊 ESTADO INICIAL:');
+    console.log(`   usedCodes incluye "${testCode}":`, usedCodes.includes(testCode));
+    console.log(`   Índice en array:`, usedCodes.indexOf(testCode));
+    console.log(`   usedCodes completo:`, usedCodes);
+    
+    // 2. Verificar que el cliente existe
+    const client = clients.find(c => c.identificacion === testCode);
+    if (!client) {
+        console.log('❌ Cliente no encontrado');
+        return;
+    }
+    console.log(`✅ Cliente encontrado: ${client.nombre}`);
+    
+    // 3. Simular el proceso EXACTO de reingreso
+    console.log('🔄 EJECUTANDO REINGRESO...');
+    
+    const index = usedCodes.indexOf(testCode);
+    if (index === -1) {
+        console.log('❌ Código no encontrado en usedCodes');
+        return;
+    }
+    
+    console.log(`✅ Código encontrado en índice: ${index}`);
+    
+    // 4. Remover LOCALMENTE
+    usedCodes.splice(index, 1);
+    localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
+    
+    console.log('📱 DESPUÉS DE REMOVER LOCAL:');
+    console.log(`   usedCodes incluye "${testCode}":`, usedCodes.includes(testCode));
+    console.log(`   Nuevo usedCodes:`, usedCodes);
+    
+    // 5. Sincronizar con la nube
+    console.log('☁️ SINCRONIZANDO CON NUBE...');
+    await syncToCloud();
+    
+    // 6. Verificar estado final
+    console.log('📊 ESTADO FINAL:');
+    console.log(`   usedCodes incluye "${testCode}":`, usedCodes.includes(testCode));
+    
+    // 7. Actualizar UI
+    updateStats();
+    renderClientsList();
+    
+    console.log('🎉 PRUEBA COMPLETADA');
+    
+    if (!usedCodes.includes(testCode)) {
+        showMessage('✅ ¡Reingreso funcionó correctamente en la prueba!', 'success');
+    } else {
+        showMessage('❌ El reingreso no funcionó en la prueba', 'error');
+    }
+}
+
+// Ejecuta: testReentryControlled()
+
+// PRUEBA RÁPIDA DESDE CONSOLA
+async function quickReentryTest(code = '001DM') {
+    console.log(`⚡ PRUEBA RÁPIDA: ${code}`);
+    
+    // Verificar estado inicial
+    console.log(`📊 INICIAL: usedCodes incluye "${code}":`, usedCodes.includes(code));
+    
+    // Ejecutar reingreso
+    $('#codigo-reingreso').value = code;
+    await handleReentry();
+    
+    // Verificar estado final
+    setTimeout(() => {
+        console.log(`📊 FINAL: usedCodes incluye "${code}":`, usedCodes.includes(code));
+    }, 2000);
+}
+
+// Ejecuta: quickReentryTest('001DM')
