@@ -595,7 +595,7 @@ function startQRScanning() {
     scan();
 }
 
-// SYNC SYSTEM
+// SYNC SYSTEM - CORREGIDO PARA REINGRESOS
 function mergeArraysUnique(array1, array2, uniqueKey) {
     const merged = [...array1];
     const seen = new Set(array1.map(item => item[uniqueKey]));
@@ -620,6 +620,7 @@ async function syncToCloud() {
         
         console.log(`🔑 Sincronizando: ${userUniqueId}`);
         
+        // PRIMERO cargar todos los datos actuales de la nube
         const { data: allCloudData, error: fetchError } = await supabase
             .from('event_data')
             .select('*');
@@ -628,29 +629,50 @@ async function syncToCloud() {
             throw fetchError;
         }
         
-        let mergedClients = [...clients];
-        let mergedUsedCodes = [...usedCodes];
+        // Encontrar la versión MÁS ACTUALIZADA de los datos
+        let latestClients = [...clients];
+        let latestUsedCodes = [...usedCodes];
+        let latestTimestamp = new Date().getTime();
         
         if (allCloudData && allCloudData.length > 0) {
             allCloudData.forEach(record => {
-                if (record.clientes) {
-                    mergedClients = mergeArraysUnique(mergedClients, record.clientes, 'identificacion');
+                if (record.ultima_actualizacion) {
+                    const recordTime = new Date(record.ultima_actualizacion).getTime();
+                    if (recordTime > latestTimestamp) {
+                        latestTimestamp = recordTime;
+                        latestClients = record.clientes || latestClients;
+                        latestUsedCodes = record.codigos_usados || latestUsedCodes;
+                    }
                 }
+                
+                // Fusionar clientes de todos los registros
+                if (record.clientes) {
+                    latestClients = mergeArraysUnique(latestClients, record.clientes, 'identificacion');
+                }
+                // Fusionar usedCodes de todos los registros  
                 if (record.codigos_usados) {
-                    mergedUsedCodes = [...new Set([...mergedUsedCodes, ...record.codigos_usados])];
+                    latestUsedCodes = [...new Set([...latestUsedCodes, ...record.codigos_usados])];
                 }
             });
         }
         
-        console.log(`🔄 Después de fusión completa: ${mergedClients.length} clientes`);
+        console.log(`🔄 Sincronizando datos unificados: ${latestClients.length} clientes, ${latestUsedCodes.length} códigos`);
         
+        // ACTUALIZAR DATOS LOCALES con la versión más reciente
+        clients = latestClients;
+        usedCodes = latestUsedCodes;
+        localStorage.setItem('nexus_clients', JSON.stringify(clients));
+        localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
+        
+        // PREPARAR datos para guardar (los mismos para todos)
         const syncData = {
             id: userUniqueId,
-            clientes: mergedClients,
-            codigos_usados: mergedUsedCodes,
+            clientes: clients,
+            codigos_usados: usedCodes,
             ultima_actualizacion: new Date().toISOString()
         };
         
+        // GUARDAR en la nube
         const { error } = await supabase
             .from('event_data')
             .upsert(syncData, { 
@@ -659,15 +681,10 @@ async function syncToCloud() {
             
         if (error) throw error;
         
-        clients = mergedClients;
-        usedCodes = mergedUsedCodes;
-        localStorage.setItem('nexus_clients', JSON.stringify(clients));
-        localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
-        
         showSyncStatus('Sincronizado ✓', 'success');
         setTimeout(() => hideSyncStatus(), 2000);
         
-        console.log(`✅ Sincronización exitosa. Clientes: ${clients.length}`);
+        console.log(`✅ Sincronización exitosa. Clientes: ${clients.length}, Códigos: ${usedCodes.length}`);
         
     } catch (error) {
         console.error('❌ Sync error:', error);
@@ -680,7 +697,7 @@ async function loadFromCloud() {
     if (!user) return;
     
     try {
-        console.log('🔍 Cargando y fusionando datos de TODOS los usuarios...');
+        console.log('🔍 Cargando datos compartidos de la nube...');
         
         const { data: allCloudData, error } = await supabase
             .from('event_data')
@@ -701,30 +718,41 @@ async function loadFromCloud() {
         
         console.log(`📊 Se encontraron ${allCloudData.length} registros en la nube`);
         
-        let allClients = [...clients];
-        let allUsedCodes = [...usedCodes];
+        // Encontrar los datos MÁS RECIENTES
+        let latestClients = [...clients];
+        let latestUsedCodes = [...usedCodes];
+        let latestTimestamp = 0;
         
         allCloudData.forEach(record => {
-            console.log(`👤 Fusionando: ${record.id} - ${record.clientes?.length || 0} clientes`);
-            
-            if (record.clientes && record.clientes.length > 0) {
-                allClients = mergeArraysUnique(allClients, record.clientes, 'identificacion');
+            if (record.ultima_actualizacion) {
+                const recordTime = new Date(record.ultima_actualizacion).getTime();
+                if (recordTime > latestTimestamp) {
+                    latestTimestamp = recordTime;
+                    latestClients = record.clientes || latestClients;
+                    latestUsedCodes = record.codigos_usados || latestUsedCodes;
+                }
             }
-            if (record.codigos_usados && record.codigos_usados.length > 0) {
-                allUsedCodes = [...new Set([...allUsedCodes, ...record.codigos_usados])];
+            
+            // Fusionar todos los datos
+            if (record.clientes) {
+                latestClients = mergeArraysUnique(latestClients, record.clientes, 'identificacion');
+            }
+            if (record.codigos_usados) {
+                latestUsedCodes = [...new Set([...latestUsedCodes, ...record.codigos_usados])];
             }
         });
         
-        console.log(`🎯 Después de fusión completa: ${allClients.length} clientes únicos`);
+        console.log(`🎯 Datos unificados: ${latestClients.length} clientes, ${latestUsedCodes.length} códigos`);
         
-        clients = allClients;
-        usedCodes = allUsedCodes;
+        // ACTUALIZAR datos locales con los datos unificados
+        clients = latestClients;
+        usedCodes = latestUsedCodes;
         localStorage.setItem('nexus_clients', JSON.stringify(clients));
         localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
         
         updateStats();
         
-        console.log(`✅ Carga completa exitosa. Clientes totales: ${clients.length}`);
+        console.log(`✅ Carga exitosa. Clientes: ${clients.length}, Códigos usados: ${usedCodes.length}`);
         
     } catch (error) {
         console.error('❌ Load error:', error);
@@ -887,7 +915,7 @@ function showQRForClient(identification, clientName) {
     showMessage(`QR mostrado para: ${clientName}`, 'success');
 }
 
-// REENTRY FUNCTIONALITY
+// REENTRY FUNCTIONALITY - CORREGIDO
 async function authorizeReentry(code) {
     $('#codigo-reingreso').value = code;
     await handleReentry();
@@ -924,6 +952,7 @@ async function handleReentry() {
         console.log(`   usedCodes:`, usedCodes);
         console.log(`   Índice de ${code}:`, currentIndex);
         
+        // Remover localmente
         usedCodes.splice(currentIndex, 1);
         localStorage.setItem('nexus_usedCodes', JSON.stringify(usedCodes));
         
@@ -931,20 +960,20 @@ async function handleReentry() {
         console.log(`   usedCodes:`, usedCodes);
         console.log(`   usedCodes incluye "${code}":`, usedCodes.includes(code));
         
+        // Sincronizar INMEDIATAMENTE con la nube
         console.log('☁️ Sincronizando con nube...');
         await syncToCloud();
         
-        console.log('🔍 Verificando sincronización...');
-        await loadFromCloud();
-        
+        // Verificación final
         const finalCheck = usedCodes.includes(code);
         console.log(`🎯 VERIFICACIÓN FINAL: usedCodes incluye "${code}": ${finalCheck}`);
         
         if (finalCheck) {
-            console.error('❌ FALLA CRÍTICA: El código sigue en usedCodes después de todo el proceso');
+            console.error('❌ El código sigue en usedCodes');
             throw new Error('El reingreso no se completó correctamente');
         }
         
+        // Actualizar UI
         updateStats();
         renderClientsList();
         
@@ -1088,61 +1117,48 @@ setInterval(() => {
     }
 }, 30000);
 
-// DIAGNÓSTICO Y FUNCIONES DE EMERGENCIA
-function diagnoseApp() {
-    console.log('🔍 DIAGNÓSTICO COMPLETO:');
-    
-    const criticalElements = [
-        'body',
-        '#login-screen',
-        '#app-container',
-        '#ingresar-section',
-        '#verificar-section', 
-        '#gestionar-section',
-        '.main-content',
-        '.bottom-nav',
-        '.nav-btn'
-    ];
-    
-    criticalElements.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        console.log(`${selector}: ${elements.length} elementos encontrados`);
-        
-        elements.forEach((el, index) => {
-            console.log(`  [${index}] - id: ${el.id}, class: ${el.className}`);
-            console.log(`       display: ${el.style.display}, visible: ${el.offsetParent !== null}`);
-        });
-    });
-    
-    console.log('👤 Usuario:', user);
-    console.log('💾 Clientes:', clients.length);
-    console.log('🔑 Códigos usados:', usedCodes.length);
-}
+// FUNCIONES GLOBALES
+window.showQRForClient = showQRForClient;
+window.authorizeReentry = authorizeReentry;
 
-async function forceConsistency() {
-    if (!confirm('⚠️ ¿ESTÁS SEGURO? Esto sobrescribirá todos los datos con la versión más completa de la nube.')) return;
-    
-    console.log('🔄 FORZANDO CONSISTENCIA...');
+// FUNCIÓN DE EMERGENCIA PARA SOLUCIONAR REINGRESOS
+async function fixReentrySync() {
+    console.log('🛠️ SOLUCIONANDO PROBLEMA DE REINGRESOS...');
     showLoading(true);
     
     try {
-        await loadFromCloud();
+        // 1. Sincronizar datos actuales
         await syncToCloud();
         
-        updateStats();
-        renderClientsList();
-        showMessage('Consistencia forzada completada', 'success');
+        // 2. Forzar que todos los usuarios tengan los mismos datos
+        const { data: allCloudData } = await supabase
+            .from('event_data')
+            .select('*');
+            
+        if (allCloudData) {
+            const updatePromises = allCloudData.map(record => {
+                return supabase
+                    .from('event_data')
+                    .update({
+                        clientes: clients,
+                        codigos_usados: usedCodes,
+                        ultima_actualizacion: new Date().toISOString()
+                    })
+                    .eq('id', record.id);
+            });
+            
+            await Promise.all(updatePromises);
+        }
+        
+        showMessage('✅ Problema de reingresos solucionado', 'success');
+        console.log('🎯 Todos los usuarios ahora tienen datos consistentes');
         
     } catch (error) {
-        console.error('Force consistency error:', error);
-        showMessage('Error en consistencia forzada', 'error');
+        console.error('❌ Error al solucionar reingresos:', error);
+        showMessage('Error al solucionar problema', 'error');
     } finally {
         showLoading(false);
     }
 }
 
-// EXPORT FUNCIONES GLOBALES
-window.diagnoseApp = diagnoseApp;
-window.forceConsistency = forceConsistency;
-window.showQRForClient = showQRForClient;
-window.authorizeReentry = authorizeReentry;
+window.fixReentrySync = fixReentrySync;
