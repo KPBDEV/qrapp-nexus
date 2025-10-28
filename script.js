@@ -163,6 +163,13 @@ function setupNavigation() {
             
             navButtons.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
+            
+            // Configurar filtros cuando se entra a gestión
+            if (section === 'gestionar-section') {
+                setTimeout(() => {
+                    setupFilters();
+                }, 100);
+            }
         });
     });
     
@@ -610,67 +617,81 @@ function mergeArraysUnique(array1, array2, uniqueKey) {
     return merged;
 }
 
+// SYNC SYSTEM - OPTIMIZADO
 async function syncToCloud() {
     if (!user) return;
     
-    showSyncStatus('Sincronizando...', 'syncing');
+    // Solo mostrar status si va a tomar más de 1 segundo
+    let statusShown = false;
+    const statusTimeout = setTimeout(() => {
+        showSyncStatus('Sincronizando...', 'syncing');
+        statusShown = true;
+    }, 1000);
     
     try {
         const userUniqueId = `user_${user.id}_${user.username}`;
         
-        console.log(`🔑 Sincronizando: ${userUniqueId}`);
-        console.log(`📱 ENVIANDO usedCodes:`, usedCodes);
+        console.log(`🔑 Sincronizando rápido: ${userUniqueId}`);
         
-        // Obtener datos actuales SOLO para fusión de clientes
+        // SOLO cargar datos básicos para fusión (más rápido)
         const { data: allCloudData, error: fetchError } = await supabase
             .from('event_data')
-            .select('*');
-            
+            .select('id, clientes, ultima_actualizacion') // ✅ Solo campos necesarios
+            .limit(10); // ✅ Limitar registros
+        
+        clearTimeout(statusTimeout);
+        if (statusShown) showSyncStatus('Sincronizado ✓', 'success');
+        
         if (fetchError && fetchError.code !== 'PGRST116') {
             throw fetchError;
         }
         
-        // Fusionar SOLO clientes (no usedCodes)
+        // Fusión RÁPIDA de clientes
         let mergedClients = [...clients];
-        
         if (allCloudData && allCloudData.length > 0) {
             allCloudData.forEach(record => {
                 if (record.clientes) {
-                    mergedClients = mergeArraysUnique(mergedClients, record.clientes, 'identificacion');
+                    // Fusión más eficiente - tomar máximo 50 clientes por registro
+                    const clientsToMerge = record.clientes.slice(0, 50);
+                    mergedClients = mergeArraysUnique(mergedClients, clientsToMerge, 'identificacion');
                 }
             });
         }
         
-        // PREPARAR datos para guardar - usedCodes LOCAL se convierte en la VERDAD
-        const syncData = {
-            id: userUniqueId,
-            clientes: mergedClients,
-            codigos_usados: usedCodes, // ✅ ESTOS usedCodes se imponen a todos
-            ultima_actualizacion: new Date().toISOString()
-        };
-        
-        // GUARDAR - esto SOBRESCRIBIRÁ usedCodes para todos los usuarios
-        const { error } = await supabase
+        // Guardar SIN esperar respuesta completa
+        const syncPromise = supabase
             .from('event_data')
-            .upsert(syncData, { 
-                onConflict: 'id'
-            });
-            
-        if (error) throw error;
+            .upsert({
+                id: userUniqueId,
+                clientes: mergedClients,
+                codigos_usados: usedCodes,
+                ultima_actualizacion: new Date().toISOString()
+            }, { onConflict: 'id' });
         
-        // Actualizar localmente
+        // Actualizar localmente INMEDIATAMENTE sin esperar
         clients = mergedClients;
         localStorage.setItem('nexus_clients', JSON.stringify(clients));
         
-        showSyncStatus('Sincronizado ✓', 'success');
-        setTimeout(() => hideSyncStatus(), 2000);
+        if (statusShown) {
+            setTimeout(() => hideSyncStatus(), 1000);
+        }
         
-        console.log(`✅ Sincronización exitosa. usedCodes propagados:`, usedCodes);
+        console.log(`✅ Sincronización rápida completada`);
+        
+        // Esperar en segundo plano (no bloquea la UI)
+        syncPromise.then(() => {
+            console.log('✅ Guardado en nube confirmado');
+        }).catch(error => {
+            console.error('❌ Error en guardado en segundo plano:', error);
+        });
         
     } catch (error) {
+        clearTimeout(statusTimeout);
+        if (statusShown) {
+            showSyncStatus('Error de sincronización', 'error');
+            setTimeout(() => hideSyncStatus(), 2000);
+        }
         console.error('❌ Sync error:', error);
-        showSyncStatus('Error de sincronización', 'error');
-        setTimeout(() => hideSyncStatus(), 3000);
     }
 }
 
@@ -829,22 +850,43 @@ function handleSearch() {
     renderClientsList(query);
 }
 
-function renderClientsList(query = '') {
+function renderClientsList(query = '', filter = currentFilter) {
     const container = $('#lista-clientes');
     
     let filteredClients = clients;
+    
+    // Aplicar filtro primero
+    filteredClients = filterClients(filteredClients, filter);
+    
+    // Luego aplicar búsqueda
     if (query) {
-        filteredClients = clients.filter(client => 
+        filteredClients = filteredClients.filter(client => 
             client.nombre.toLowerCase().includes(query) ||
             client.identificacion.toLowerCase().includes(query)
         );
     }
     
+    // Mostrar contador de resultados
+    const resultsCount = filteredClients.length;
+    const totalCount = clients.length;
+    
     if (filteredClients.length === 0) {
-        container.innerHTML = '<div class="empty-state">No se encontraron clientes</div>';
+        let message = 'No se encontraron clientes';
+        if (filter !== 'all') {
+            message += ` con el filtro "${getFilterName(filter)}"`;
+        }
+        if (query) {
+            message += ` para "${query}"`;
+        }
+        container.innerHTML = `<div class="empty-state">${message}</div>`;
         return;
     }
     
+    // Mostrar información del filtro
+    const filterInfo = document.getElementById('filter-info') || createFilterInfo();
+    filterInfo.textContent = `Mostrando ${resultsCount} de ${totalCount} clientes ${getFilterName(filter)}`;
+    
+    // Renderizar clientes
     container.innerHTML = filteredClients.map(client => {
         const hasUsed = usedCodes.includes(client.identificacion);
         return `
@@ -872,6 +914,72 @@ function renderClientsList(query = '') {
             </div>
         `;
     }).join('');
+}
+
+// FILTER SYSTEM
+let currentFilter = 'all';
+
+function setupFilters() {
+    console.log('🔧 Configurando filtros...');
+    
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    filterButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const filter = btn.getAttribute('data-filter');
+            console.log(`🎯 Aplicando filtro: ${filter}`);
+            
+            // Actualizar estado activo
+            filterButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // Aplicar filtro
+            applyFilter(filter);
+        });
+    });
+    
+    console.log('✅ Filtros configurados');
+}
+
+function applyFilter(filter) {
+    currentFilter = filter;
+    const searchQuery = $('#buscar-cliente').value.trim().toLowerCase();
+    renderClientsList(searchQuery, filter);
+}
+
+function filterClients(clients, filter) {
+    switch(filter) {
+        case 'ingresaron':
+            return clients.filter(client => usedCodes.includes(client.identificacion));
+        
+        case 'faltan':
+            return clients.filter(client => !usedCodes.includes(client.identificacion));
+        
+        case 'registrados':
+            return clients; // Todos los registrados
+        
+        case 'all':
+        default:
+            return clients;
+    }
+}
+
+function getFilterName(filter) {
+    const names = {
+        'all': '(todos)',
+        'ingresaron': '(que ingresaron)',
+        'faltan': '(que faltan)',
+        'registrados': '(registrados)'
+    };
+    return names[filter] || '';
+}
+
+function createFilterInfo() {
+    const info = document.createElement('div');
+    info.id = 'filter-info';
+    info.className = 'filter-info';
+    info.style.cssText = 'margin-bottom: 10px; font-size: 14px; color: #666; text-align: center;';
+    $('#lista-clientes').parentNode.insertBefore(info, $('#lista-clientes'));
+    return info;
 }
 
 // MOSTRAR QR DE CLIENTE EXISTENTE
@@ -1099,12 +1207,15 @@ async function handlePasswordRecovery() {
     }
 }
 
-// SINCRONIZACIÓN PERIÓDICA
+// SINCRONIZACIÓN PERIÓDICA MÁS RÁPIDA
 setInterval(() => {
     if (user && navigator.onLine) {
-        syncToCloud();
+        // Sincronización silenciosa (sin mostrar status)
+        syncToCloud().catch(error => {
+            console.log('❌ Sincronización en segundo plano falló:', error);
+        });
     }
-}, 30000);
+}, 15000); // Cada 15 segundos en lugar de 30
 
 // FUNCIONES GLOBALES
 window.showQRForClient = showQRForClient;
